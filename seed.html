@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>TripShare - Seed Data</title>
+<style>
+body{font-family:sans-serif;max-width:600px;margin:40px auto;padding:0 20px;background:#1a1a2e;color:#eee}
+h1{color:#0A84FF}
+button{background:#0A84FF;color:#fff;border:none;padding:12px 24px;border-radius:8px;font-size:16px;cursor:pointer;margin:8px 4px}
+button:hover{background:#0066CC}
+button.danger{background:#FF453A}
+#log{background:#111;padding:16px;border-radius:8px;margin-top:16px;font-family:monospace;font-size:13px;max-height:400px;overflow-y:auto;white-space:pre-wrap}
+.ok{color:#30D158}.err{color:#FF453A}.info{color:#0A84FF}
+</style>
+</head>
+<body>
+<h1>TripShare Seed Data</h1>
+<p>Firestoreにダミーデータを投入します。先にログインしてください。</p>
+<button onclick="loginGoogle()">Googleでログイン</button>
+<button onclick="seedAll()">ダミーデータ投入</button>
+<button class="danger" onclick="clearAll()">データ削除</button>
+<div id="log"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, doc, setDoc, addDoc, getDocs, deleteDoc,
+  query, where, serverTimestamp, Timestamp, writeBatch }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyBhfNSM8lghkwMt3ury-pwjh2GtD-39K_c",
+  authDomain: "tripshare-fa284.firebaseapp.com",
+  projectId: "tripshare-fa284",
+  storageBucket: "tripshare-fa284.firebasestorage.app",
+  messagingSenderId: "794362309245",
+  appId: "1:794362309245:web:29ca898969502d72799f14",
+});
+const auth = getAuth(app);
+const db = getFirestore(app);
+let user = null;
+
+const logEl = document.getElementById("log");
+function log(msg, cls="info") {
+  const span = document.createElement("span");
+  span.className = cls;
+  span.textContent = msg + "\n";
+  logEl.appendChild(span);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+onAuthStateChanged(auth, (u) => {
+  if (u) { user = u; log("ログイン済み: " + u.displayName, "ok"); }
+});
+
+window.loginGoogle = async () => {
+  try {
+    const result = await signInWithPopup(auth, new GoogleAuthProvider());
+    user = result.user;
+    log("ログイン成功: " + user.displayName, "ok");
+  } catch(e) { log("ログインエラー: " + e.message, "err"); }
+};
+
+// Dummy users (固定ID)
+const dummyUsers = [
+  { uid: "dummy_tanaka", name: "田中 晃生", email: "tanaka@example.com", avatar: "", color: "c4", initial: "田" },
+  { uid: "dummy_sato",   name: "佐藤 花子", email: "sato@example.com",   avatar: "", color: "c1", initial: "佐" },
+  { uid: "dummy_takahashi", name: "高橋 翔", email: "takahashi@example.com", avatar: "", color: "c3", initial: "高" },
+  { uid: "dummy_yamada", name: "山田 里奈", email: "yamada@example.com", avatar: "", color: "c5", initial: "山" },
+];
+
+function ts(dateStr) {
+  return Timestamp.fromDate(new Date(dateStr));
+}
+
+window.seedAll = async () => {
+  if (!user) { log("先にログインしてください", "err"); return; }
+  log("=== データ投入開始 ===");
+
+  try {
+    // 1. Users
+    log("ユーザーを作成中...");
+    await setDoc(doc(db, "users", user.uid), {
+      uid: user.uid, name: user.displayName || "User",
+      email: user.email, avatar: user.photoURL || "",
+      createdAt: serverTimestamp()
+    }, { merge: true });
+    for (const u of dummyUsers) {
+      await setDoc(doc(db, "users", u.uid), {
+        uid: u.uid, name: u.name, email: u.email, avatar: u.avatar, createdAt: serverTimestamp()
+      }, { merge: true });
+    }
+    log("ユーザー5名作成完了", "ok");
+
+    // 2. Trips
+    log("旅行グループを作成中...");
+    const allUids = [user.uid, ...dummyUsers.map(u => u.uid)];
+    const myName = user.displayName || "User";
+    const myAvatar = user.photoURL || "";
+
+    // Trip 1: 宮崎旅行
+    const trip1Ref = doc(db, "trips", "trip_miyazaki");
+    await setDoc(trip1Ref, {
+      name: "宮崎旅行",
+      startDate: "2026-09-07",
+      endDate: "2026-09-09",
+      coverColor: "cov-m",
+      createdBy: user.uid,
+      memberUids: allUids,
+      members: [
+        { uid: user.uid, name: myName, avatar: myAvatar, role: "owner", color: "c4", initial: myName.charAt(0) },
+        { uid: "dummy_sato", name: "佐藤 花子", avatar: "", role: "member", color: "c1", initial: "佐" },
+        { uid: "dummy_takahashi", name: "高橋 翔", avatar: "", role: "member", color: "c3", initial: "高" },
+        { uid: "dummy_yamada", name: "山田 里奈", avatar: "", role: "member", color: "c5", initial: "山" },
+      ],
+      createdAt: serverTimestamp(),
+      isPublic: true,
+      latestAction: "高橋さんが写真を追加",
+    });
+
+    // Trip 2: 女子旅 in 京都
+    const trip2Ref = doc(db, "trips", "trip_kyoto");
+    await setDoc(trip2Ref, {
+      name: "女子旅 in 京都",
+      startDate: "2026-08-05",
+      endDate: "2026-08-07",
+      coverColor: "cov-k",
+      createdBy: "dummy_sato",
+      memberUids: [user.uid, "dummy_sato", "dummy_yamada"],
+      members: [
+        { uid: "dummy_sato", name: "佐藤 花子", avatar: "", role: "owner", color: "c2", initial: "佐" },
+        { uid: user.uid, name: myName, avatar: myAvatar, role: "member", color: "c5", initial: myName.charAt(0) },
+        { uid: "dummy_yamada", name: "山田 里奈", avatar: "", role: "member", color: "c6", initial: "山" },
+      ],
+      createdAt: serverTimestamp(),
+      isPublic: false,
+      latestAction: "佐藤さんがチャット送信",
+    });
+
+    // Trip 3: 北海道卒業旅行
+    const trip3Ref = doc(db, "trips", "trip_hokkaido");
+    await setDoc(trip3Ref, {
+      name: "北海道卒業旅行",
+      startDate: "2026-07-20",
+      endDate: "2026-07-23",
+      coverColor: "cov-h",
+      createdBy: user.uid,
+      memberUids: allUids,
+      members: [
+        { uid: user.uid, name: myName, avatar: myAvatar, role: "owner", color: "c4", initial: myName.charAt(0) },
+        { uid: "dummy_sato", name: "佐藤 花子", avatar: "", role: "member", color: "c1", initial: "佐" },
+        { uid: "dummy_takahashi", name: "高橋 翔", avatar: "", role: "member", color: "c3", initial: "高" },
+        { uid: "dummy_yamada", name: "山田 里奈", avatar: "", role: "member", color: "c2", initial: "山" },
+      ],
+      createdAt: serverTimestamp(),
+      isPublic: false,
+      latestAction: "全345枚",
+    });
+    log("旅行3グループ作成完了", "ok");
+
+    // 3. Messages for 宮崎旅行
+    log("チャットメッセージを作成中...");
+    const msgs = [
+      { senderId: user.uid, senderName: myName, text: "みんな集合! 今どこ?", sentAt: ts("2026-09-07T09:02:00") },
+      { senderId: "dummy_sato", senderName: "佐藤 花子", text: "もうすぐ着くよ! 5分待って", sentAt: ts("2026-09-07T09:04:00") },
+      { senderId: "dummy_takahashi", senderName: "高橋 翔", text: "青島神社すごくきれいだった!", sentAt: ts("2026-09-07T10:47:00") },
+      { senderId: "dummy_yamada", senderName: "山田 里奈", text: "いい写真!", sentAt: ts("2026-09-07T10:50:00") },
+      { senderId: user.uid, senderName: myName, text: "次は堀切峠行こう!", sentAt: ts("2026-09-07T11:05:00") },
+      { senderId: "dummy_sato", senderName: "佐藤 花子", text: "チキン南蛮食べたい!", sentAt: ts("2026-09-07T12:15:00") },
+      { senderId: "dummy_takahashi", senderName: "高橋 翔", text: "お昼どこにする?", sentAt: ts("2026-09-07T12:20:00") },
+    ];
+    for (const m of msgs) {
+      await addDoc(collection(db, "trips", "trip_miyazaki", "messages"), {
+        ...m, type: "text", senderAvatar: ""
+      });
+    }
+    log("メッセージ7件作成完了", "ok");
+
+    // 4. Schedules for 宮崎旅行
+    log("スケジュールを作成中...");
+    const scheds = [
+      { title: "宮崎駅", desc: "集合・荷物を預ける", date: "2026-09-07", time: "09:00", icon: "train" },
+      { title: "青島神社", desc: "参拝・鬼の洗濯板を見学", date: "2026-09-07", time: "10:30", icon: "landmark" },
+      { title: "昼食", desc: "チキン南蛮・冷汁を食べる", date: "2026-09-07", time: "12:30", icon: "utensils" },
+      { title: "堀切峠", desc: "絶景ポイント・写真撮影", date: "2026-09-07", time: "14:00", icon: "mountain" },
+      { title: "海岸を散歩", desc: "白浜海岸・夕日鑑賞", date: "2026-09-07", time: "15:30", icon: "waves" },
+      { title: "ホテルチェックイン", desc: "リゾートホテル到着", date: "2026-09-07", time: "17:00", icon: "landmark" },
+      { title: "朝食", desc: "ホテルバイキング", date: "2026-09-08", time: "08:00", icon: "utensils" },
+      { title: "高千穂峡", desc: "ボート体験・真名井の滝", date: "2026-09-08", time: "10:00", icon: "mountain" },
+    ];
+    for (const s of scheds) {
+      await addDoc(collection(db, "trips", "trip_miyazaki", "schedules"), {
+        title: s.title, description: s.desc, date: s.date, time: s.time, icon: s.icon,
+        createdBy: user.uid, createdAt: serverTimestamp()
+      });
+    }
+    log("スケジュール8件作成完了", "ok");
+
+    // 5. Photos (metadata only - no actual images)
+    log("写真メタデータを作成中...");
+    const photoColors = ["p1","p2","p3","p4","p5","p6","p7","p8","p9","p10","p11","p12"];
+    const uploaders = [
+      { uid: user.uid, name: myName, color: "c4", initial: myName.charAt(0) },
+      { uid: "dummy_sato", name: "佐藤 花子", color: "c1", initial: "佐" },
+      { uid: "dummy_takahashi", name: "高橋 翔", color: "c3", initial: "高" },
+      { uid: "dummy_yamada", name: "山田 里奈", color: "c5", initial: "山" },
+    ];
+    const times = ["09:12","09:36","10:05","10:18","11:22","12:07","12:36","13:44","14:12","14:55","15:30","16:02"];
+    for (let i = 0; i < 12; i++) {
+      const up = uploaders[i % 4];
+      await addDoc(collection(db, "trips", "trip_miyazaki", "photos"), {
+        r2Url: "",
+        thumbUrl: "",
+        placeholderColor: photoColors[i],
+        uploaderUid: up.uid,
+        uploaderName: up.name,
+        uploaderColor: up.color,
+        uploaderInitial: up.initial,
+        caption: "",
+        takenAt: ts(`2026-09-07T${times[i]}:00`),
+        location: null,
+      });
+    }
+    // 京都の写真
+    for (let i = 0; i < 12; i++) {
+      const up = uploaders[(i+1) % 3 === 0 ? 2 : (i+1) % 3]; // rotate 3 members
+      await addDoc(collection(db, "trips", "trip_kyoto", "photos"), {
+        r2Url: "", thumbUrl: "", placeholderColor: photoColors[(i+3) % 12],
+        uploaderUid: up.uid, uploaderName: up.name, uploaderColor: up.color, uploaderInitial: up.initial,
+        caption: "", takenAt: ts(`2026-08-05T${times[i]}:00`), location: null,
+      });
+    }
+    log("写真24枚メタデータ作成完了", "ok");
+
+    // 6. Public posts (世界のみんなタブ用)
+    log("公開投稿を作成中...");
+    const posts = [
+      { title: "宮崎を満喫する2泊3日", location: "宮崎県・青島神社・日南海岸", coverColor: "cov-m", likes: 1271, views: 1728, photoCount: 45, tripId: "trip_miyazaki" },
+      { title: "京都グルメ旅行", location: "京都府・嵐山・清水寺", coverColor: "cov-k", likes: 842, views: 2103, photoCount: 89, tripId: "trip_kyoto" },
+      { title: "沖縄リゾート3日間", location: "沖縄県・美ら海・瀬長島", coverColor: "p12", likes: 619, views: 1456, photoCount: 67, tripId: "" },
+    ];
+    for (const p of posts) {
+      await addDoc(collection(db, "public_posts"), {
+        ...p, authorId: user.uid, createdAt: serverTimestamp()
+      });
+    }
+    log("公開投稿3件作成完了", "ok");
+
+    log("=== 全データ投入完了! ===", "ok");
+    log("http://localhost:3000 を開いてアプリを確認してください。");
+  } catch (e) {
+    log("エラー: " + e.message, "err");
+    console.error(e);
+  }
+};
+
+window.clearAll = async () => {
+  if (!user) { log("先にログインしてください", "err"); return; }
+  if (!confirm("全ダミーデータを削除しますか?")) return;
+  log("=== データ削除開始 ===");
+
+  try {
+    const tripIds = ["trip_miyazaki", "trip_kyoto", "trip_hokkaido"];
+    const subcols = ["messages", "schedules", "photos"];
+    for (const tid of tripIds) {
+      for (const sub of subcols) {
+        const snap = await getDocs(collection(db, "trips", tid, sub));
+        for (const d of snap.docs) await deleteDoc(d.ref);
+        log(`${tid}/${sub}: ${snap.size}件削除`, "info");
+      }
+      await deleteDoc(doc(db, "trips", tid));
+    }
+    // public_posts
+    const pSnap = await getDocs(collection(db, "public_posts"));
+    for (const d of pSnap.docs) await deleteDoc(d.ref);
+    log(`public_posts: ${pSnap.size}件削除`, "info");
+
+    // dummy users
+    for (const u of dummyUsers) await deleteDoc(doc(db, "users", u.uid));
+    log("ダミーユーザー削除完了", "info");
+
+    log("=== 全データ削除完了 ===", "ok");
+  } catch(e) { log("エラー: " + e.message, "err"); }
+};
+</script>
+</body>
+</html>
