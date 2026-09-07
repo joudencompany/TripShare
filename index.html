@@ -334,13 +334,14 @@ window.renderTripDetailSchedule = (allScheds, startDate, endDate) => {
   const timelineEl = document.getElementById("td-schedule-body");
   if (!tabsEl || !timelineEl) return;
 
-  // 日付一覧を生成
+  // 日付一覧を生成（UTC変換を避けてローカルで処理）
   const dates = [];
   if (startDate) {
-    const sd = new Date(startDate + "T00:00:00");
-    const ed = endDate ? new Date(endDate + "T00:00:00") : sd;
+    const sd = new Date(startDate + "T12:00:00");
+    const ed = endDate ? new Date(endDate + "T12:00:00") : new Date(sd);
     for (let d = new Date(sd); d <= ed; d.setDate(d.getDate() + 1)) {
-      dates.push(d.toISOString().split('T')[0]);
+      const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+      dates.push(`${y}-${m}-${day}`);
     }
   }
   if (dates.length === 0) {
