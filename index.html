@@ -10,7 +10,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, query, where, orderBy,
+import { getFirestore, collection, addDoc, query, where,
   onSnapshot, serverTimestamp, doc, setDoc, getDoc, getDocs, Timestamp, updateDoc, arrayUnion }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -28,13 +28,11 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// グローバルに公開
 window._db = db;
 window._collection = collection;
 window._addDoc = addDoc;
 window._query = query;
 window._where = where;
-window._orderBy = orderBy;
 window._onSnapshot = onSnapshot;
 window._serverTimestamp = serverTimestamp;
 window._doc = doc;
@@ -42,147 +40,12 @@ window._setDoc = setDoc;
 window._getDoc = getDoc;
 window._getDocs = getDocs;
 
-// リスナー解除用
 let unsubTrips = null;
 let unsubMessages = null;
 let unsubPhotos = null;
 let unsubSchedules = null;
 let unsubPublicPosts = null;
-
-// ===== デモデータ自動投入 =====
-async function seedDemoData(user) {
-  const uid = user.uid;
-  const myName = user.displayName || "User";
-  const myAvatar = user.photoURL || "";
-  const myInitial = myName.charAt(0);
-
-  // 既にデモデータがあるかチェック
-  const check = await getDoc(doc(db, "trips", "trip_miyazaki"));
-  if (check.exists()) {
-    // 既にあるが自分がメンバーでない場合は追加
-    const data = check.data();
-    if (data.memberUids && !data.memberUids.includes(uid)) {
-      const tripIds = ["trip_miyazaki", "trip_kyoto", "trip_hokkaido"];
-      for (const tid of tripIds) {
-        try {
-          await updateDoc(doc(db, "trips", tid), {
-            memberUids: arrayUnion(uid),
-            members: arrayUnion({ uid, name: myName, avatar: myAvatar, role: "member", color: "c4", initial: myInitial })
-          });
-        } catch(e) { console.warn("デモ旅行への参加スキップ:", tid, e.message); }
-      }
-    }
-    return;
-  }
-
-  console.log("デモデータを投入中...");
-  const ts = (d) => Timestamp.fromDate(new Date(d));
-
-  // ダミーユーザー
-  const dummies = [
-    { uid: "dummy_sato", name: "佐藤 花子", email: "sato@example.com" },
-    { uid: "dummy_takahashi", name: "高橋 翔", email: "takahashi@example.com" },
-    { uid: "dummy_yamada", name: "山田 里奈", email: "yamada@example.com" },
-  ];
-  for (const u of dummies) {
-    await setDoc(doc(db, "users", u.uid), { ...u, avatar: "", createdAt: serverTimestamp() }, { merge: true });
-  }
-
-  // 旅行1: 宮崎旅行
-  const allUids = [uid, "dummy_sato", "dummy_takahashi", "dummy_yamada"];
-  await setDoc(doc(db, "trips", "trip_miyazaki"), {
-    name: "宮崎旅行", startDate: "2026-09-07", endDate: "2026-09-09", coverColor: "cov-m",
-    createdBy: uid, memberUids: allUids, isPublic: true, latestAction: "高橋さんが写真を追加",
-    members: [
-      { uid, name: myName, avatar: myAvatar, role: "owner", color: "c4", initial: myInitial },
-      { uid: "dummy_sato", name: "佐藤 花子", avatar: "", role: "member", color: "c1", initial: "佐" },
-      { uid: "dummy_takahashi", name: "高橋 翔", avatar: "", role: "member", color: "c3", initial: "高" },
-      { uid: "dummy_yamada", name: "山田 里奈", avatar: "", role: "member", color: "c5", initial: "山" },
-    ],
-    createdAt: serverTimestamp(),
-  });
-
-  // 旅行2: 女子旅 in 京都
-  await setDoc(doc(db, "trips", "trip_kyoto"), {
-    name: "女子旅 in 京都", startDate: "2026-08-05", endDate: "2026-08-07", coverColor: "cov-k",
-    createdBy: "dummy_sato", memberUids: [uid, "dummy_sato", "dummy_yamada"], isPublic: false,
-    latestAction: "佐藤さんがチャット送信",
-    members: [
-      { uid: "dummy_sato", name: "佐藤 花子", avatar: "", role: "owner", color: "c2", initial: "佐" },
-      { uid, name: myName, avatar: myAvatar, role: "member", color: "c5", initial: myInitial },
-      { uid: "dummy_yamada", name: "山田 里奈", avatar: "", role: "member", color: "c6", initial: "山" },
-    ],
-    createdAt: serverTimestamp(),
-  });
-
-  // 旅行3: 北海道卒業旅行
-  await setDoc(doc(db, "trips", "trip_hokkaido"), {
-    name: "北海道卒業旅行", startDate: "2026-07-20", endDate: "2026-07-23", coverColor: "cov-h",
-    createdBy: uid, memberUids: allUids, isPublic: false, latestAction: "全345枚",
-    members: [
-      { uid, name: myName, avatar: myAvatar, role: "owner", color: "c4", initial: myInitial },
-      { uid: "dummy_sato", name: "佐藤 花子", avatar: "", role: "member", color: "c1", initial: "佐" },
-      { uid: "dummy_takahashi", name: "高橋 翔", avatar: "", role: "member", color: "c3", initial: "高" },
-      { uid: "dummy_yamada", name: "山田 里奈", avatar: "", role: "member", color: "c2", initial: "山" },
-    ],
-    createdAt: serverTimestamp(),
-  });
-
-  // メッセージ（宮崎旅行）
-  const msgs = [
-    { senderId: uid, senderName: myName, text: "みんな集合! 今どこ?", sentAt: ts("2026-09-07T09:02:00") },
-    { senderId: "dummy_sato", senderName: "佐藤 花子", text: "もうすぐ着くよ! 5分待って", sentAt: ts("2026-09-07T09:04:00") },
-    { senderId: "dummy_takahashi", senderName: "高橋 翔", text: "青島神社すごくきれいだった!", sentAt: ts("2026-09-07T10:47:00") },
-    { senderId: "dummy_yamada", senderName: "山田 里奈", text: "いい写真!", sentAt: ts("2026-09-07T10:50:00") },
-    { senderId: uid, senderName: myName, text: "次は堀切峠行こう!", sentAt: ts("2026-09-07T11:05:00") },
-    { senderId: "dummy_sato", senderName: "佐藤 花子", text: "チキン南蛮食べたい!", sentAt: ts("2026-09-07T12:15:00") },
-  ];
-  for (const m of msgs) {
-    await addDoc(collection(db, "trips", "trip_miyazaki", "messages"), { ...m, type: "text", senderAvatar: "" });
-  }
-
-  // スケジュール（宮崎旅行）
-  const scheds = [
-    { title: "宮崎駅", description: "集合・荷物を預ける", date: "2026-09-07", time: "09:00", icon: "train" },
-    { title: "青島神社", description: "参拝・鬼の洗濯板を見学", date: "2026-09-07", time: "10:30", icon: "landmark" },
-    { title: "昼食", description: "チキン南蛮・冷汁を食べる", date: "2026-09-07", time: "12:30", icon: "utensils" },
-    { title: "堀切峠", description: "絶景ポイント・写真撮影", date: "2026-09-07", time: "14:00", icon: "mountain" },
-    { title: "海岸を散歩", description: "白浜海岸・夕日鑑賞", date: "2026-09-07", time: "15:30", icon: "waves" },
-  ];
-  for (const s of scheds) {
-    await addDoc(collection(db, "trips", "trip_miyazaki", "schedules"), { ...s, createdBy: uid, createdAt: serverTimestamp() });
-  }
-
-  // 写真メタデータ（宮崎旅行）
-  const colors = ["p1","p2","p3","p4","p5","p6","p7","p8","p9","p10","p11","p12"];
-  const uploaders = [
-    { uid, name: myName, color: "c4", initial: myInitial },
-    { uid: "dummy_sato", name: "佐藤 花子", color: "c1", initial: "佐" },
-    { uid: "dummy_takahashi", name: "高橋 翔", color: "c3", initial: "高" },
-    { uid: "dummy_yamada", name: "山田 里奈", color: "c5", initial: "山" },
-  ];
-  const times = ["09:12","09:36","10:05","10:18","11:22","12:07","12:36","13:44","14:12","14:55","15:30","16:02"];
-  for (let i = 0; i < 12; i++) {
-    const up = uploaders[i % 4];
-    await addDoc(collection(db, "trips", "trip_miyazaki", "photos"), {
-      r2Url: "", thumbUrl: "", placeholderColor: colors[i],
-      uploaderUid: up.uid, uploaderName: up.name, uploaderColor: up.color, uploaderInitial: up.initial,
-      caption: "", takenAt: ts(`2026-09-07T${times[i]}:00`), location: null,
-    });
-  }
-
-  // 公開投稿
-  const posts = [
-    { title: "宮崎を満喫する2泊3日", location: "宮崎県・青島神社・日南海岸", coverColor: "cov-m", likes: 1271, views: 1728, photoCount: 45 },
-    { title: "京都グルメ旅行", location: "京都府・嵐山・清水寺", coverColor: "cov-k", likes: 842, views: 2103, photoCount: 89 },
-    { title: "沖縄リゾート3日間", location: "沖縄県・美ら海・瀬長島", coverColor: "p12", likes: 619, views: 1456, photoCount: 67 },
-  ];
-  for (const p of posts) {
-    await addDoc(collection(db, "public_posts"), { ...p, authorId: uid, createdAt: serverTimestamp() });
-  }
-
-  console.log("デモデータ投入完了!");
-}
+let unsubAllSchedules = null;
 
 // ===== ログイン状態監視 =====
 onAuthStateChanged(auth, async (user) => {
@@ -195,11 +58,24 @@ onAuthStateChanged(auth, async (user) => {
       if (!snap.exists()) {
         await setDoc(userRef, { uid: user.uid, name: user.displayName||"User", email: user.email, avatar: user.photoURL||"", createdAt: serverTimestamp() });
       }
-      // デモデータ自動投入
-      await seedDemoData(user);
+      // ログインユーザーをデモ旅行に追加
+      const tripIds = ["trip_miyazaki", "trip_kyoto", "trip_hokkaido"];
+      for (const tid of tripIds) {
+        try {
+          const tSnap = await getDoc(doc(db, "trips", tid));
+          if (tSnap.exists()) {
+            const d = tSnap.data();
+            if (d.memberUids && !d.memberUids.includes(user.uid)) {
+              await updateDoc(doc(db, "trips", tid), {
+                memberUids: arrayUnion(user.uid),
+                members: arrayUnion({ uid: user.uid, name: user.displayName||"User", avatar: user.photoURL||"", role: "member", color: "c4", initial: (user.displayName||"U").charAt(0) })
+              });
+            }
+          }
+        } catch(e) { console.warn("旅行参加スキップ:", tid, e.message); }
+      }
     } catch(e) { console.warn("Firestore処理スキップ:", e.message); }
 
-    // ホーム画面へ遷移
     const splash = document.getElementById("screen-splash");
     if (splash && splash.classList.contains("active")) {
       const st = document.getElementById("splash-status");
@@ -212,7 +88,6 @@ onAuthStateChanged(auth, async (user) => {
     }
   } else {
     window._fbUser = null;
-    // リスナー解除
     if (unsubTrips) { unsubTrips(); unsubTrips = null; }
     if (unsubPublicPosts) { unsubPublicPosts(); unsubPublicPosts = null; }
   }
@@ -271,14 +146,9 @@ window.sendMsgFB = async (tripId, text) => {
 // ===== 旅行一覧をリアルタイム監視 =====
 function startWatchingTrips(uid) {
   if (unsubTrips) unsubTrips();
-  // 複合インデックス不要にするためorderByなし、JS側でソート
-  const q = query(
-    collection(db, "trips"),
-    where("memberUids", "array-contains", uid)
-  );
+  const q = query(collection(db, "trips"), where("memberUids", "array-contains", uid));
   unsubTrips = onSnapshot(q, (snap) => {
     const trips = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    // 新しい順にソート
     trips.sort((a, b) => {
       const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
       const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
@@ -299,9 +169,7 @@ function startWatchingPublicPosts() {
   unsubPublicPosts = onSnapshot(q, (snap) => {
     const posts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderWorldTab(posts);
-  }, (err) => {
-    console.error("公開投稿の取得エラー:", err);
-  });
+  }, (err) => { console.error("公開投稿の取得エラー:", err); });
 }
 
 // ===== 旅行詳細を開く =====
@@ -311,16 +179,16 @@ window.openTrip = (tripId) => {
   window._currentTrip = trip;
   window._currentTripId = tripId;
 
-  // マップ画面のヘッダーを更新
-  document.getElementById("map-trip-title").textContent = trip.name;
-  renderMapMembers(trip.members || []);
+  // トリップ詳細画面を更新
+  document.getElementById("td-trip-name").textContent = trip.name;
+  renderTripDetailMembers(trip.members || []);
 
   // 各サブデータの監視を開始
   startWatchingMessages(tripId);
   startWatchingPhotos(tripId);
-  startWatchingSchedules(tripId, trip.startDate || "2026-09-07");
+  startWatchingAllSchedules(tripId, trip.startDate, trip.endDate);
 
-  goTo("map");
+  goTo("trip-detail");
 };
 
 // ===== メッセージ監視 =====
@@ -355,14 +223,23 @@ function startWatchingPhotos(tripId) {
   });
 }
 
-// ===== スケジュール監視 =====
+// ===== 全スケジュール監視（日付タブ用） =====
+function startWatchingAllSchedules(tripId, startDate, endDate) {
+  if (unsubAllSchedules) unsubAllSchedules();
+  const q = query(collection(db, "trips", tripId, "schedules"));
+  unsubAllSchedules = onSnapshot(q, (snap) => {
+    const allScheds = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    allScheds.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    window._allSchedules = allScheds;
+    renderTripDetailSchedule(allScheds, startDate, endDate);
+  });
+}
+
+// ===== スケジュール監視（個別画面用） =====
 function startWatchingSchedules(tripId, date) {
   if (unsubSchedules) unsubSchedules();
   window._currentSchedDate = date;
-  const q = query(
-    collection(db, "trips", tripId, "schedules"),
-    where("date", "==", date)
-  );
+  const q = query(collection(db, "trips", tripId, "schedules"), where("date", "==", date));
   unsubSchedules = onSnapshot(q, (snap) => {
     const scheds = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     scheds.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
@@ -371,7 +248,7 @@ function startWatchingSchedules(tripId, date) {
 }
 
 // ============================================================
-//  レンダリング関数（グローバルに公開）
+//  レンダリング関数
 // ============================================================
 
 // --- 旅行一覧 ---
@@ -413,11 +290,7 @@ window.renderWorldTab = (posts) => {
   const rankEl = document.getElementById("world-rank-list");
   const feedEl = document.getElementById("world-feed");
   if (!rankEl || !feedEl) return;
-
-  // likes順にソート
   posts.sort((a, b) => (b.likes || 0) - (a.likes || 0));
-
-  // ランキング（上位3件）
   const rankColors = ["g", "s", "br"];
   rankEl.innerHTML = posts.slice(0, 3).map((p, i) => `
     <div class="rank-item">
@@ -427,8 +300,6 @@ window.renderWorldTab = (posts) => {
       <div class="rank-likes">${I.heart}${(p.likes||0).toLocaleString()}</div>
     </div>
   `).join('');
-
-  // フィード
   feedEl.innerHTML = posts.map(p => `
     <div class="world-card">
       <div class="world-cover ${p.coverColor || 'cov-m'}"></div>
@@ -443,6 +314,77 @@ window.renderWorldTab = (posts) => {
       </div>
     </div>
   `).join('');
+};
+
+// --- トリップ詳細: メンバー横並び ---
+window.renderTripDetailMembers = (members) => {
+  const el = document.getElementById("td-members-row");
+  if (!el) return;
+  el.innerHTML = members.map(m => `
+    <div class="td-mem">
+      <div class="av td-mem-av ${m.color || 'c4'}">${m.avatar ? `<img src="${m.avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : (m.initial || '?')}</div>
+      <div class="td-mem-nm">${esc((m.name || '').split(' ')[0])}</div>
+    </div>
+  `).join('');
+};
+
+// --- トリップ詳細: スケジュール（日付タブ＋タイムライン） ---
+window.renderTripDetailSchedule = (allScheds, startDate, endDate) => {
+  const tabsEl = document.getElementById("td-day-tabs");
+  const timelineEl = document.getElementById("td-schedule-body");
+  if (!tabsEl || !timelineEl) return;
+
+  // 日付一覧を生成
+  const dates = [];
+  if (startDate) {
+    const sd = new Date(startDate + "T00:00:00");
+    const ed = endDate ? new Date(endDate + "T00:00:00") : sd;
+    for (let d = new Date(sd); d <= ed; d.setDate(d.getDate() + 1)) {
+      dates.push(d.toISOString().split('T')[0]);
+    }
+  }
+  if (dates.length === 0) {
+    const uniqueDates = [...new Set(allScheds.map(s => s.date))].sort();
+    dates.push(...uniqueDates);
+  }
+  if (dates.length === 0) dates.push(new Date().toISOString().split('T')[0]);
+
+  // アクティブ日付
+  if (!window._tdActiveDate || !dates.includes(window._tdActiveDate)) {
+    window._tdActiveDate = dates[0];
+  }
+
+  // 日付タブ
+  tabsEl.innerHTML = dates.map((d, i) => {
+    const dt = new Date(d + "T00:00:00");
+    const label = `${i+1}日目 (${dt.getMonth()+1}/${dt.getDate()})`;
+    const isOn = d === window._tdActiveDate;
+    return `<div class="td-day-tab ${isOn ? 'on' : ''}" onclick="window._tdActiveDate='${d}';renderTripDetailSchedule(window._allSchedules||[],'${startDate}','${endDate}')">${label}</div>`;
+  }).join('');
+
+  // その日のスケジュール
+  const dayScheds = allScheds.filter(s => s.date === window._tdActiveDate);
+  dayScheds.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+  if (dayScheds.length === 0) {
+    timelineEl.innerHTML = '<div style="padding:30px;text-align:center;color:#999;font-size:14px">この日の予定はまだありません</div>';
+    return;
+  }
+
+  timelineEl.innerHTML = dayScheds.map((s, i) => {
+    const iconSvg = I[s.icon] || I.pin;
+    const isLast = i === dayScheds.length - 1;
+    return `<div class="td-tl-item">
+      <div class="td-tl-left">
+        <div class="td-tl-time">${s.time || ''}</div>
+        <div class="td-tl-dot-wrap"><div class="td-tl-dot"></div>${isLast ? '' : '<div class="td-tl-line"></div>'}</div>
+      </div>
+      <div class="td-tl-card">
+        <div class="td-tl-ico">${iconSvg}</div>
+        <div class="td-tl-info"><div class="td-tl-place">${esc(s.title)}</div><div class="td-tl-desc">${esc(s.description || '')}</div></div>
+      </div>
+    </div>`;
+  }).join('');
 };
 
 // --- チャットメッセージ ---
@@ -462,10 +404,8 @@ window.renderMessages = (msgs) => {
     const isMe = m.senderId === uid;
     const timeStr = sentAt.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
     const initial = m.senderName?.charAt(0) || "?";
-    // メンバー情報から色を取得
     const member = (window._currentTrip?.members || []).find(mm => mm.uid === m.senderId);
     const color = member?.color || "c4";
-
     if (isMe) {
       html += `<div class="msg me"><div class="av msg-av ${color}">${initial}</div><div class="msg-w">
         <div class="msg-b">${esc(m.text)}</div><div class="msg-t">${timeStr}</div></div></div>`;
@@ -488,7 +428,6 @@ window.renderPhotoGrid = (photos) => {
     const color = p.uploaderColor || "c4";
     const initial = p.uploaderInitial || "?";
     const bgClass = p.placeholderColor || "p1";
-    // 実際の写真URLがあればimg、なければグラデーション
     const fill = p.r2Url
       ? `<img class="fill" src="${p.r2Url}" alt="" style="width:100%;height:100%;object-fit:cover">`
       : `<div class="fill ${bgClass}"></div>`;
@@ -503,7 +442,6 @@ window.renderAlbum = (photos) => {
   const nameEl = document.getElementById("album-name");
   const membersEl = document.getElementById("album-members");
   if (!el) return;
-
   const trip = window._currentTrip;
   if (nameEl && trip) nameEl.textContent = trip.name;
   if (membersEl && trip) {
@@ -516,15 +454,12 @@ window.renderAlbum = (photos) => {
     const myCount = photos.filter(p => p.uploaderUid === window._fbUser?.uid).length;
     statsEl.innerHTML = `<div class="alb-s">全 <span>${photos.length}</span> 枚</div><div class="alb-s">あなた <span>${myCount}</span> 枚</div>`;
   }
-
-  // 日付ごとにグループ化
   const byDate = {};
   photos.forEach(p => {
     const d = p.takenAt?.toDate ? p.takenAt.toDate().toLocaleDateString("ja-JP") : "不明";
     if (!byDate[d]) byDate[d] = [];
     byDate[d].push(p);
   });
-
   let html = "";
   let dayNum = 1;
   for (const [date, dayPhotos] of Object.entries(byDate)) {
@@ -541,23 +476,20 @@ window.renderAlbum = (photos) => {
   el.innerHTML = html || '<div style="padding:40px;text-align:center;color:#999">写真はまだありません</div>';
 };
 
-// --- スケジュール ---
+// --- スケジュール（個別画面） ---
 window.renderSchedule = (scheds, date) => {
   const el = document.getElementById("schedule-timeline");
   const dateEl = document.getElementById("schedule-date-label");
   if (!el) return;
-
   if (dateEl) {
     const d = new Date(date + "T00:00:00");
     dateEl.innerHTML = `<div class="sched-d">${d.toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric", weekday: "short" })}</div>
       <div class="sched-sub">${window._currentTrip?.name || ''}</div>`;
   }
-
   if (scheds.length === 0) {
     el.innerHTML = '<div style="padding:40px;text-align:center;color:#999">この日の予定はありません</div>';
     return;
   }
-
   el.innerHTML = scheds.map((s, i) => {
     const iconSvg = I[s.icon] || I.pin;
     const isLast = i === scheds.length - 1;
@@ -591,15 +523,6 @@ window.renderMembers = () => {
     }).join('');
 };
 
-// マップ画面のメンバーアバター
-window.renderMapMembers = (members) => {
-  const el = document.getElementById("map-members");
-  if (!el) return;
-  el.innerHTML = members.slice(0, 3).map(m =>
-    `<div class="av ${m.color || 'c4'}" style="width:28px;height:28px">${m.initial || '?'}</div>`
-  ).join('');
-};
-
 // ===== ユーティリティ =====
 function esc(s) { const d = document.createElement("div"); d.textContent = s || ""; return d.innerHTML; }
 function formatDateRange(s, e) {
@@ -614,20 +537,20 @@ function formatDateRange(s, e) {
   return `${fmt(sd)} - ${fmt(ed)}`;
 }
 
-// グローバルに公開
 window.goTo = goTo;
 window.startWatchingSchedules = startWatchingSchedules;
 
 function goTo(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  const screens = {'splash':'screen-splash','home':'screen-home','map':'screen-map','schedule':'screen-schedule',
+  const screens = {'splash':'screen-splash','home':'screen-home','trip-detail':'screen-trip-detail','schedule':'screen-schedule',
     'camera-roll':'screen-camera-roll','album':'screen-album','camera':'screen-camera','chat':'screen-chat','members':'screen-members','profile':'screen-profile'};
   const el = document.getElementById(screens[id]);
   if (el) el.classList.add('active');
 
-  // 画面遷移時にデータ更新
   if (id === 'members') renderMembers();
   if (id === 'chat') {
+    const tn = document.getElementById("chat-trip-name");
+    if (tn && window._currentTrip) tn.textContent = window._currentTrip.name;
     setTimeout(() => {
       const chatEl = document.getElementById("chat-messages");
       if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;
@@ -636,15 +559,17 @@ function goTo(id) {
   if (id === 'camera') startCamera();
   if (id !== 'camera') stopCamera();
   if (id === 'profile') renderProfile();
-  // アルバムをホームのbnavから開いた場合、最初の旅行を自動選択
   if (id === 'album' && !window._currentTrip && window._trips?.length) {
     const t = window._trips[0];
     window._currentTrip = t;
     window._currentTripId = t.id;
-    if (typeof window.startWatchingPhotosForAlbum === 'function') window.startWatchingPhotosForAlbum(t.id);
+    startWatchingPhotos(t.id);
   }
   if (id === 'album' && window._currentPhotos) {
     renderAlbum(window._currentPhotos);
+  }
+  if (id === 'schedule' && window._currentTripId) {
+    startWatchingSchedules(window._currentTripId, window._currentTrip?.startDate || new Date().toISOString().split('T')[0]);
   }
 }
 
@@ -664,7 +589,6 @@ async function startCamera() {
     });
     video.srcObject = camStream;
     if (ph) ph.style.display = 'none';
-    // 旅行名を表示
     const tn = document.getElementById('cam-trip-name');
     if (tn && window._currentTrip) tn.textContent = window._currentTrip.name;
   } catch(e) {
@@ -702,22 +626,37 @@ function renderProfile() {
       av.textContent = (user.displayName || 'U').charAt(0);
     }
   }
-  // プロフィール画面のアイコン注入
   document.querySelectorAll('#screen-profile [data-icon]').forEach(el => {
     el.innerHTML = I[el.dataset.icon] || '';
   });
 }
 
+// カメラモード: 'photo' | 'dual' | 'video'
+let camMode = 'photo';
+let mediaRecorder = null;
+let recordedChunks = [];
+let isRecording = false;
+let longPressTimer = null;
+
+function setCamMode(mode) {
+  camMode = mode;
+  document.querySelectorAll('.cam-mode-btn').forEach(b => b.classList.remove('on'));
+  const btn = document.querySelector(`.cam-mode-btn[data-mode="${mode}"]`);
+  if (btn) btn.classList.add('on');
+  // Update shutter style
+  const shut = document.querySelector('.cam-shut');
+  if (shut) {
+    shut.style.borderColor = mode === 'video' ? '#FF453A' : 'rgba(255,255,255,.35)';
+  }
+}
+
 function takePhoto() {
+  if (camMode === 'dual') { takeDualPhoto(); return; }
   const video = document.getElementById('cam-video');
   const canvas = document.getElementById('cam-canvas');
   const flash = document.getElementById('cam-flash');
   if (!video || !canvas || !video.videoWidth) return;
-
-  // フラッシュ演出
   if (flash) { flash.style.opacity = '1'; setTimeout(() => { flash.style.opacity = '0'; }, 150); }
-
-  // キャプチャ
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   const ctx = canvas.getContext('2d');
@@ -727,17 +666,144 @@ function takePhoto() {
   }
   ctx.drawImage(video, 0, 0);
   const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+  updateLastPhoto(dataUrl);
+  console.log('写真を撮影しました（サイズ:', Math.round(dataUrl.length/1024), 'KB）');
+}
 
-  // サムネイルを更新
+// デュアルカメラ（内外合成）
+async function takeDualPhoto() {
+  const video = document.getElementById('cam-video');
+  const canvas = document.getElementById('cam-canvas');
+  const flash = document.getElementById('cam-flash');
+  if (!video || !canvas || !video.videoWidth) return;
+
+  // 1. 現在のカメラ（外カメ）をキャプチャ
+  if (flash) { flash.style.opacity = '1'; setTimeout(() => { flash.style.opacity = '0'; }, 150); }
+  const w = video.videoWidth, h = video.videoHeight;
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+  const outerData = ctx.getImageData(0, 0, w, h);
+
+  // 2. カメラ切替
+  const origMode = camFacingMode;
+  camFacingMode = camFacingMode === 'environment' ? 'user' : 'environment';
+  if (camStream) camStream.getTracks().forEach(t => t.stop());
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: camFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false
+    });
+    video.srcObject = camStream;
+    await new Promise(r => { video.onloadeddata = r; setTimeout(r, 1500); });
+    await new Promise(r => setTimeout(r, 500));
+  } catch(e) {
+    console.error('内カメ切替失敗:', e);
+    camFacingMode = origMode;
+    startCamera();
+    return;
+  }
+
+  // 3. 内カメキャプチャ
+  if (flash) { flash.style.opacity = '1'; setTimeout(() => { flash.style.opacity = '0'; }, 150); }
+  const iw = video.videoWidth, ih = video.videoHeight;
+  const innerCanvas = document.createElement('canvas');
+  innerCanvas.width = iw; innerCanvas.height = ih;
+  const ictx = innerCanvas.getContext('2d');
+  // 内カメはミラー
+  ictx.translate(iw, 0);
+  ictx.scale(-1, 1);
+  ictx.drawImage(video, 0, 0);
+
+  // 4. 合成: メイン（外カメ）＋小窓（内カメ）
+  canvas.width = w; canvas.height = h;
+  ctx.putImageData(outerData, 0, 0);
+  // 右上に小窓（丸角）
+  const sw = Math.round(w * 0.3), sh = Math.round(h * 0.3);
+  const sx = w - sw - 20, sy = 20;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(sx, sy, sw, sh, 16);
+  ctx.clip();
+  ctx.drawImage(innerCanvas, 0, 0, iw, ih, sx, sy, sw, sh);
+  ctx.restore();
+  // 枠線
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.roundRect(sx, sy, sw, sh, 16);
+  ctx.stroke();
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+  updateLastPhoto(dataUrl);
+  console.log('デュアル写真を撮影しました');
+
+  // 元のカメラに戻す
+  camFacingMode = origMode;
+  startCamera();
+}
+
+// 長押し動画撮影
+function startVideoRecording() {
+  if (camMode !== 'video' || !camStream || isRecording) return;
+  isRecording = true;
+  recordedChunks = [];
+  const shut = document.querySelector('.cam-shut');
+  if (shut) { shut.style.background = '#FF453A'; shut.style.transform = 'scale(0.85)'; }
+  // 録画インジケーター
+  const indicator = document.getElementById('cam-rec-indicator');
+  if (indicator) indicator.style.display = 'flex';
+
+  try {
+    mediaRecorder = new MediaRecorder(camStream, { mimeType: 'video/webm;codecs=vp9' });
+  } catch(e) {
+    try { mediaRecorder = new MediaRecorder(camStream); } catch(e2) { console.error('録画不可:', e2); isRecording = false; return; }
+  }
+  mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    console.log('動画を撮影しました（サイズ:', Math.round(blob.size/1024), 'KB）');
+    updateLastPhoto(null, url);
+  };
+  mediaRecorder.start();
+}
+
+function stopVideoRecording() {
+  if (!isRecording || !mediaRecorder) return;
+  isRecording = false;
+  mediaRecorder.stop();
+  const shut = document.querySelector('.cam-shut');
+  if (shut) { shut.style.background = '#fff'; shut.style.transform = ''; }
+  const indicator = document.getElementById('cam-rec-indicator');
+  if (indicator) indicator.style.display = 'none';
+}
+
+// シャッターボタンのイベント
+function onShutterDown() {
+  if (camMode === 'video') {
+    longPressTimer = setTimeout(() => startVideoRecording(), 200);
+  }
+}
+function onShutterUp() {
+  if (camMode === 'video') {
+    clearTimeout(longPressTimer);
+    if (isRecording) { stopVideoRecording(); }
+    else { takePhoto(); } // 短押しは通常写真
+  } else {
+    takePhoto();
+  }
+}
+
+function updateLastPhoto(dataUrl, videoUrl) {
   const lastPhoto = document.getElementById('cam-last-photo');
-  if (lastPhoto) {
+  if (lastPhoto && dataUrl) {
     lastPhoto.style.backgroundImage = `url(${dataUrl})`;
     lastPhoto.style.backgroundSize = 'cover';
     lastPhoto.style.backgroundPosition = 'center';
+  } else if (lastPhoto && videoUrl) {
+    lastPhoto.style.backgroundImage = '';
+    lastPhoto.style.background = 'linear-gradient(135deg,#FF453A,#FF6B6B)';
   }
-
-  console.log('写真を撮影しました（サイズ:', Math.round(dataUrl.length/1024), 'KB）');
-  // TODO: R2にアップロード → Firestoreに保存
 }
 </script>
 
@@ -765,7 +831,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .nhdr-r{color:var(--pri);font-size:15px;cursor:pointer;width:48px;text-align:right}
 .btn{width:100%;height:52px;border-radius:28px;font-size:16px;font-weight:600;cursor:pointer;border:none;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .15s}
 .btn:active{transform:scale(.97)}
-.btn-pri{background:var(--pri);color:#fff}
+.btn-pri{background:linear-gradient(135deg,#2196F3,#42A5F5);color:#fff;box-shadow:0 4px 16px rgba(33,150,243,.3)}
 .btn-out{background:rgba(255,255,255,.2);color:#fff;border:1.5px solid rgba(255,255,255,.5);backdrop-filter:blur(8px)}
 .btn-blue-out{background:none;color:var(--pri);border:2px solid var(--pri)}
 .btn-dashed{background:none;color:var(--pri);border:2px dashed rgba(10,132,255,.3)}
@@ -789,7 +855,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .splash-top{flex:1}
 .splash-btns{width:100%;padding-bottom:60px;display:flex;flex-direction:column;gap:12px}
 .splash-status{text-align:center;font-size:13px;color:rgba(255,255,255,.7);margin-top:6px;min-height:18px}
-/* ログイン画面ボタンは元のスタイルを維持 */
 #screen-splash .btn-pri{background:#0A84FF;box-shadow:none}
 #screen-splash .btn-out{background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.5);backdrop-filter:blur(8px)}
 
@@ -818,9 +883,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .trip-foot-bottom{display:flex;align-items:center;justify-content:space-between}
 .trip-latest{font-size:12px;color:var(--text3);flex:1}
 .trip-track-btn{font-size:12px;color:var(--pri);font-weight:600;background:var(--pri-light);padding:5px 14px;border-radius:16px;cursor:pointer}
-.trip-arr{width:20px;height:20px;color:var(--text3)}
 .create-wrap{padding:4px 16px 16px}
-.btn-pri{background:linear-gradient(135deg,#2196F3,#42A5F5);color:#fff;box-shadow:0 4px 16px rgba(33,150,243,.3)}
 
 /* World tab */
 .world{padding:16px;display:flex;flex-direction:column;gap:16px}
@@ -838,31 +901,57 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .world-loc .ico{width:14px;height:14px}.world-stats{display:flex;gap:14px;margin-top:8px}
 .ws{font-size:13px;color:var(--text3);display:flex;align-items:center;gap:3px}.ws .ico{width:14px;height:14px}
 
-/* ===== MAP ===== */
-#screen-map{background:#e4e8ec}
-.map-wrap{position:absolute;inset:0}
-.map-bg{width:100%;height:100%;background:#e4e8ec;background-image:linear-gradient(rgba(255,255,255,.7) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.7) 1px,transparent 1px),linear-gradient(rgba(255,255,255,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.3) 1px,transparent 1px);background-size:80px 80px,80px 80px,20px 20px,20px 20px;position:relative}
-.map-svg{position:absolute;inset:0;width:100%;height:100%}
-.map-pin{position:absolute;width:46px;height:46px;border-radius:50%;border:3px solid #fff;overflow:hidden;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.25);transform:translate(-50%,-50%);transition:transform .2s}
-.map-pin:hover{transform:translate(-50%,-50%) scale(1.12)}
-.map-label{position:absolute;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);padding:4px 10px;border-radius:8px;font-size:11px;font-weight:600;color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.1);transform:translate(-50%,0);white-space:nowrap}
-.map-hdr{position:absolute;top:0;left:0;right:0;z-index:20;padding:52px 16px 14px;background:linear-gradient(rgba(248,250,254,.97) 65%,transparent)}
-.map-hdr-top{display:flex;align-items:center;justify-content:space-between}
-.map-trip-name{font-size:19px;font-weight:700;color:var(--text);margin-left:8px}
-.map-hdr-r{display:flex;align-items:center;gap:8px}
-.map-cam-fab{position:absolute;bottom:200px;right:16px;width:54px;height:54px;background:var(--pri);border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(10,132,255,.4);z-index:20}
-.map-cam-fab .ico{width:24px;height:24px;color:#fff}
-.map-bottom{position:absolute;bottom:82px;left:0;right:0;z-index:20;background:rgba(255,255,255,.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:10px 16px}
-.map-stats{display:flex;align-items:center;gap:16px;margin-bottom:6px}
-.map-stat{font-size:13px;color:var(--text3)}.map-stat b{color:var(--text)}
-.toggle-w{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--text)}
-.toggle{width:44px;height:26px;background:#30D158;border-radius:13px;position:relative;cursor:pointer;flex-shrink:0}
-.toggle::after{content:'';position:absolute;width:22px;height:22px;background:#fff;border-radius:50%;top:2px;right:2px;box-shadow:0 1px 3px rgba(0,0,0,.2)}
-.photo-strip{display:flex;gap:8px;overflow-x:auto;padding:4px 0}.photo-strip::-webkit-scrollbar{display:none}
-.strip-t{width:52px;height:52px;border-radius:10px;flex-shrink:0;cursor:pointer}
+/* ===== TRIP DETAIL (new combined view) ===== */
+#screen-trip-detail{background:var(--bg)}
+.td-hdr{background:var(--surface);padding:52px 16px 0;flex-shrink:0;border-bottom:1px solid var(--border)}
+.td-hdr-top{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.td-hdr-back{color:var(--pri);cursor:pointer;display:flex;align-items:center}
+.td-hdr-back .ico{width:24px;height:24px}
+.td-trip-name{font-size:20px;font-weight:800;color:var(--text);flex:1}
+.td-hdr-more{width:32px;height:32px;border:none;background:var(--pri-light);border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.td-hdr-more .ico{width:18px;height:18px;color:var(--pri)}
+
+/* Members horizontal scroll */
+.td-members-sec{padding:16px}
+.td-members-label{font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px}
+.td-members-scroll{display:flex;gap:14px;overflow-x:auto;padding-bottom:4px}.td-members-scroll::-webkit-scrollbar{display:none}
+.td-mem{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0}
+.td-mem-av{width:48px;height:48px;font-size:18px}
+.td-mem-nm{font-size:11px;color:var(--text2);font-weight:500;max-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+
+/* Group add button */
+.td-add-group{display:flex;justify-content:flex-end;padding:0 16px 8px}
+.td-add-btn{background:var(--pri);color:#fff;border:none;border-radius:20px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:inherit}
+.td-add-btn .ico{width:14px;height:14px}
+
+/* GPS toggle */
+.td-gps{display:flex;align-items:center;justify-content:space-between;margin:0 16px 12px;background:var(--surface);border-radius:14px;padding:12px 16px;box-shadow:0 1px 6px rgba(0,0,0,.04)}
+.td-gps-l{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--text)}
+.td-gps-l .ico{width:18px;height:18px;color:var(--pri)}
+.toggle-sm{width:44px;height:26px;background:#30D158;border-radius:13px;position:relative;cursor:pointer;flex-shrink:0}
+.toggle-sm::after{content:'';position:absolute;width:22px;height:22px;background:#fff;border-radius:50%;top:2px;right:2px;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+
+/* Day tabs */
+.td-day-tabs{display:flex;gap:6px;padding:0 16px 12px;overflow-x:auto;flex-shrink:0}.td-day-tabs::-webkit-scrollbar{display:none}
+.td-day-tab{padding:7px 16px;border-radius:18px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;background:var(--surface);color:var(--text3);border:1px solid var(--border);transition:all .15s;flex-shrink:0}
+.td-day-tab.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+
+/* Schedule timeline in trip detail */
+.td-schedule{padding:0 16px 16px}
+.td-tl-item{display:flex;gap:10px;padding-bottom:16px}.td-tl-item:last-child{padding-bottom:0}
+.td-tl-left{display:flex;flex-direction:column;align-items:center;width:48px;flex-shrink:0}
+.td-tl-time{font-size:12px;font-weight:600;color:var(--pri);white-space:nowrap}
+.td-tl-dot-wrap{display:flex;flex-direction:column;align-items:center;margin-top:4px;flex:1}
+.td-tl-dot{width:8px;height:8px;background:var(--pri);border-radius:50%;box-shadow:0 0 0 3px rgba(33,150,243,.12);flex-shrink:0}
+.td-tl-line{width:1.5px;flex:1;background:rgba(33,150,243,.12);margin-top:3px;min-height:20px}
+.td-tl-card{flex:1;background:var(--surface);border-radius:14px;padding:12px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 6px rgba(33,150,243,.06)}
+.td-tl-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--pri-light)}
+.td-tl-ico svg{width:18px;height:18px;color:var(--pri)}
+.td-tl-place{font-size:14px;font-weight:600;color:var(--text);margin-bottom:1px}
+.td-tl-desc{font-size:11px;color:var(--text3)}
 
 /* Trip inner nav */
-.tinav{height:82px;background:rgba(255,255,255,.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;align-items:flex-start;padding-top:6px;flex-shrink:0;position:absolute;bottom:0;left:0;right:0;z-index:25}
+.tinav{height:82px;background:rgba(255,255,255,.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;align-items:flex-start;padding-top:6px;flex-shrink:0}
 .ti{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:4px 0}
 .ti .ico{width:22px;height:22px;color:var(--text3)}.ti span{font-size:10px;color:var(--text3);font-weight:500}
 .ti.on .ico{color:var(--pri)}.ti.on span{color:var(--pri)}
@@ -915,7 +1004,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .cam-view{flex:1;position:relative;overflow:hidden;background:linear-gradient(145deg,#0a0a1a,#111827,#0c1929);display:flex;align-items:center;justify-content:center}
 .cam-ph{color:rgba(255,255,255,.12);text-align:center}.cam-ph .ico{width:64px;height:64px}.cam-ph-t{font-size:13px;color:rgba(255,255,255,.15);margin-top:8px}
 .cam-top{position:absolute;top:48px;left:0;right:0;padding:8px 20px;display:flex;align-items:center;justify-content:space-between;z-index:10}
-.cam-tn{font-size:15px;font-weight:600;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.6)}.cam-zoom{background:rgba(255,255,255,.12);color:rgba(255,255,255,.8);padding:5px 14px;border-radius:20px;font-size:13px;font-weight:500}
+.cam-tn{font-size:15px;font-weight:600;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.6)}
 .cam-view video{transform:scaleX(1)}
 .cam-view video.front{transform:scaleX(-1)}
 .cam-ctrl{position:absolute;bottom:50px;left:0;right:0;display:flex;align-items:center;justify-content:space-around;z-index:10}
@@ -927,6 +1016,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .cam-bnav{height:82px;background:rgba(0,0,0,.85);backdrop-filter:blur(10px);border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:flex-start;padding-top:8px;flex-shrink:0}
 .cam-bnav .bnav-i .ico{color:rgba(255,255,255,.4)}.cam-bnav .bnav-i span{color:rgba(255,255,255,.4)}
 .cam-bnav .bnav-i.on .ico{color:#fff}.cam-bnav .bnav-i.on span{color:#fff}
+.cam-modes{position:absolute;bottom:140px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:10;background:rgba(0,0,0,.4);border-radius:20px;padding:4px}
+.cam-mode-btn{padding:6px 16px;border-radius:16px;font-size:12px;font-weight:600;color:rgba(255,255,255,.6);cursor:pointer;transition:all .15s;white-space:nowrap}
+.cam-mode-btn.on{background:rgba(255,255,255,.2);color:#fff}
+.cam-rec{position:absolute;top:90px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;background:rgba(255,0,0,.7);padding:5px 14px;border-radius:16px;z-index:15;color:#fff;font-size:12px;font-weight:700}
+.cam-rec-dot{width:8px;height:8px;background:#fff;border-radius:50%;animation:recBlink 1s infinite}
+@keyframes recBlink{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* ===== CHAT ===== */
 .chat-s{flex:1;overflow-y:auto;padding:14px 16px}.chat-s::-webkit-scrollbar{display:none}
@@ -939,6 +1034,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .msg:not(.me) .msg-b{background:var(--surface);color:var(--text);border-bottom-left-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
 .msg.me .msg-b{background:linear-gradient(135deg,#2196F3,#42A5F5);color:#fff;border-bottom-right-radius:4px}
 .msg-t{font-size:11px;color:var(--text3);padding:0 4px}
+.chat-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
+.chat-inp{flex:1;height:38px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:0 14px;font-size:14px;color:var(--text);outline:none;font-family:inherit}
+.chat-att{width:32px;height:32px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.chat-att .ico{width:20px;height:20px;color:var(--text3)}
+.chat-send{width:34px;height:34px;border:none;background:var(--pri);border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.chat-send .ico{width:16px;height:16px;color:#fff}
 
 /* ===== MEMBERS ===== */
 .mem-body{padding:16px;display:flex;flex-direction:column;gap:14px}
@@ -992,8 +1093,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .prof-item-t{flex:1;font-size:15px;font-weight:500;color:var(--text)}
 .prof-arrow{width:16px;height:16px;color:var(--text3)}
 .prof-ver{text-align:center;font-size:12px;color:var(--text3);padding:12px 0}
+.prof-section-h{padding:10px 16px 4px;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
 
-/* Loading spinner */
 .loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--text3);font-size:14px}
 @keyframes flash{0%{opacity:1}100%{opacity:0}}
 </style>
@@ -1032,20 +1133,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
     <div class="seg-t on" onclick="homeTab('mine',this)">自分たちの旅行</div>
     <div class="seg-t" onclick="homeTab('world',this)">世界のみんな</div>
   </div>
-  <!-- 自分の旅行タブ（Firestoreから動的表示） -->
   <div id="tab-mine" class="scroll">
     <div id="trip-list" class="trips">
       <div class="loading">読み込み中...</div>
     </div>
     <div class="create-wrap"><button class="btn btn-pri" onclick="if(window._fbUser){showModal();}else{loginGoogle();}">旅行グループを作る</button></div>
   </div>
-  <!-- 世界タブ（Firestoreから動的表示） -->
   <div id="tab-world" class="scroll" style="display:none">
     <div class="rank-sec">
       <div class="rank-title" id="world-rank-title">今週の人気スポット</div>
-      <div id="world-rank-list" class="rank-list">
-        <div class="loading">読み込み中...</div>
-      </div>
+      <div id="world-rank-list" class="rank-list"><div class="loading">読み込み中...</div></div>
     </div>
     <div id="world-feed" class="world"></div>
   </div>
@@ -1056,79 +1153,83 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
   </div>
 </div>
 
-<!-- MAP -->
-<div id="screen-map" class="screen">
-  <div class="map-wrap"><div class="map-bg">
-    <svg class="map-svg" viewBox="0 0 390 550" preserveAspectRatio="xMidYMid slice">
-      <rect width="390" height="550" fill="#e4e8ec"/>
-      <line x1="50" y1="0" x2="50" y2="550" stroke="#fff" stroke-width="6"/><line x1="200" y1="0" x2="200" y2="550" stroke="#fff" stroke-width="8"/>
-      <line x1="320" y1="0" x2="320" y2="550" stroke="#fff" stroke-width="5"/><line x1="0" y1="150" x2="390" y2="150" stroke="#fff" stroke-width="6"/>
-      <line x1="0" y1="300" x2="390" y2="300" stroke="#fff" stroke-width="8"/><line x1="0" y1="420" x2="390" y2="420" stroke="#fff" stroke-width="5"/>
-      <rect x="100" y="200" width="120" height="80" rx="8" fill="#d1e7dd" opacity=".6"/>
-      <ellipse cx="330" cy="350" rx="50" ry="30" fill="#bfe0f5" opacity=".6"/>
-      <text x="195" y="310" text-anchor="middle" fill="#999" font-size="14" font-weight="600">MAP API プレースホルダー</text>
-    </svg>
-  </div></div>
-  <div class="map-hdr"><div class="map-hdr-top">
-    <div style="display:flex;align-items:center"><span class="nhdr-back" onclick="goTo('home')" id="map-back-btn"></span><div class="map-trip-name" id="map-trip-title">旅行名</div></div>
-    <div class="map-hdr-r"><div id="map-members" class="av-stack"></div>
-    <button class="home-icon-btn" onclick="goTo('members')" id="map-users-btn"></button></div>
-  </div></div>
-  <button class="map-cam-fab" onclick="goTo('camera')" id="map-cam-btn"></button>
-  <div class="map-bottom">
-    <div class="map-stats"><div class="toggle-w"><div class="toggle"></div>今日の軌跡</div><div class="map-stat"><b>--</b> 移動</div><div class="map-stat"><b>--</b> 撮影</div></div>
-    <div id="map-photo-strip" class="photo-strip"></div>
+<!-- TRIP DETAIL (combined members + schedule view) -->
+<div id="screen-trip-detail" class="screen">
+  <div class="td-hdr">
+    <div class="td-hdr-top">
+      <div class="td-hdr-back" onclick="goTo('home')"><span class="ico" id="td-back-ico"></span></div>
+      <div id="td-trip-name" class="td-trip-name">旅行名</div>
+      <button class="td-hdr-more" onclick="goTo('members')" id="td-more-btn"></button>
+    </div>
   </div>
+  <div class="scroll">
+    <!-- メンバー横スクロール -->
+    <div class="td-members-sec">
+      <div class="td-members-label">メンバー</div>
+      <div id="td-members-row" class="td-members-scroll"></div>
+    </div>
+    <!-- グループ追加ボタン -->
+    <div class="td-add-group">
+      <button class="td-add-btn" onclick="goTo('members')"><span class="ico" style="width:14px;height:14px" id="td-add-ico"></span>グループ追加</button>
+    </div>
+    <!-- GPS位置共有 -->
+    <div class="td-gps">
+      <div class="td-gps-l"><span class="ico" id="td-gps-ico"></span>GPS位置共有</div>
+      <div class="toggle-sm"></div>
+    </div>
+    <!-- 日付タブ＋スケジュール -->
+    <div id="td-day-tabs" class="td-day-tabs"></div>
+    <div id="td-schedule-body" class="td-schedule">
+      <div class="loading">読み込み中...</div>
+    </div>
+  </div>
+  <!-- Trip inner nav -->
   <div class="tinav">
-    <div class="ti" onclick="goTo('chat')" id="ti-chat-map"></div>
-    <div class="ti" onclick="goTo('camera-roll')" id="ti-photo-map"></div>
-    <div class="ti on" id="ti-map-map"></div>
-    <div class="ti" onclick="goTo('album')" id="ti-album-map"></div>
-    <div class="ti" onclick="goTo('schedule')" id="ti-sched-map"></div>
+    <div class="ti" onclick="goTo('chat')" id="ti-chat"></div>
+    <div class="ti" onclick="goTo('camera-roll')" id="ti-photo"></div>
+    <div class="ti" onclick="goTo('camera')" id="ti-cam"></div>
+    <div class="ti" onclick="goTo('album')" id="ti-album"></div>
+    <div class="ti on" id="ti-sched"></div>
   </div>
 </div>
 
-<!-- SCHEDULE (Firestoreから動的表示) -->
+<!-- SCHEDULE -->
 <div id="screen-schedule" class="screen">
   <div class="sb b"><span>9:41</span><span style="font-size:13px">5G</span></div>
-  <div class="nhdr"><span class="nhdr-back" onclick="goTo('map')" id="sched-back-btn"></span><div class="nhdr-t">タイムスケジュール</div><div class="nhdr-r" style="cursor:pointer">追加</div></div>
+  <div class="nhdr"><span class="nhdr-back" onclick="goTo('trip-detail')" id="sched-back-btn"></span><div class="nhdr-t">タイムスケジュール</div><div class="nhdr-r" style="cursor:pointer">追加</div></div>
   <div class="sched-bar"><button class="sched-btn" onclick="schedPrev()" id="sched-prev-btn"></button><div id="schedule-date-label"><div class="sched-d">読み込み中...</div></div><button class="sched-btn" onclick="schedNext()" id="sched-next-btn"></button></div>
   <div class="scroll">
-    <div id="schedule-timeline" class="tl">
-      <div class="loading">読み込み中...</div>
-    </div>
+    <div id="schedule-timeline" class="tl"><div class="loading">読み込み中...</div></div>
     <div class="add-wrap"><button class="btn btn-dashed">予定を追加</button></div>
   </div>
   <div class="tinav" style="position:relative">
     <div class="ti" onclick="goTo('chat')"><span class="ico ti-ico" data-icon="chat"></span><span>チャット</span></div>
     <div class="ti" onclick="goTo('camera-roll')"><span class="ico ti-ico" data-icon="camera"></span><span>写真</span></div>
-    <div class="ti" onclick="goTo('map')"><span class="ico ti-ico" data-icon="map"></span><span>地図</span></div>
+    <div class="ti" onclick="goTo('camera')"><span class="ico ti-ico" data-icon="camera"></span><span>カメラ</span></div>
     <div class="ti" onclick="goTo('album')"><span class="ico ti-ico" data-icon="image"></span><span>アルバム</span></div>
     <div class="ti on"><span class="ico ti-ico" data-icon="calendar"></span><span>予定</span></div>
   </div>
 </div>
 
-<!-- CAMERA ROLL (Firestoreから動的表示) -->
+<!-- CAMERA ROLL -->
 <div id="screen-camera-roll" class="screen">
   <div class="sb b"><span>9:41</span><span style="font-size:13px">5G</span></div>
-  <div class="nhdr"><span class="nhdr-back" onclick="goTo('map')" id="cr-back-btn"></span><div class="nhdr-t">共有カメラロール</div><div class="nhdr-r">選択</div></div>
+  <div class="nhdr"><span class="nhdr-back" onclick="goTo('trip-detail')" id="cr-back-btn"></span><div class="nhdr-t">共有カメラロール</div><div class="nhdr-r">選択</div></div>
   <div class="cr-filter"><div class="cr-c on">新着</div><div class="cr-c">人物</div><div class="cr-c">場所</div><div class="cr-c">地図</div></div>
   <div class="scroll" style="position:relative">
-    <div id="photo-grid" class="pgrid">
-      <div class="loading" style="grid-column:1/-1">読み込み中...</div>
-    </div>
+    <div id="photo-grid" class="pgrid"><div class="loading" style="grid-column:1/-1">読み込み中...</div></div>
   </div>
   <button class="cr-fab" onclick="goTo('camera')" id="cr-cam-btn"></button>
   <div class="tinav" style="position:relative">
     <div class="ti" onclick="goTo('chat')"><span class="ico ti-ico" data-icon="chat"></span><span>チャット</span></div>
     <div class="ti on"><span class="ico ti-ico" data-icon="camera"></span><span>写真</span></div>
-    <div class="ti" onclick="goTo('map')"><span class="ico ti-ico" data-icon="map"></span><span>地図</span></div>
+    <div class="ti" onclick="goTo('camera')"><span class="ico ti-ico" data-icon="camera"></span><span>カメラ</span></div>
     <div class="ti" onclick="goTo('album')"><span class="ico ti-ico" data-icon="image"></span><span>アルバム</span></div>
     <div class="ti" onclick="goTo('schedule')"><span class="ico ti-ico" data-icon="calendar"></span><span>予定</span></div>
   </div>
 </div>
 
-<!-- ALBUM (Firestoreから動的表示) -->
+<!-- ALBUM -->
 <div id="screen-album" class="screen">
   <div class="alb-hdr">
     <div id="album-name" class="alb-name">読み込み中...</div>
@@ -1136,9 +1237,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
     <div id="album-stats" class="alb-stats"></div>
     <div class="alb-tabs"><div class="alb-tab on">メンバー</div><div class="alb-tab">場所</div><div class="alb-tab">日付</div></div>
   </div>
-  <div class="scroll"><div id="album-body" class="alb-body">
-    <div class="loading">読み込み中...</div>
-  </div></div>
+  <div class="scroll"><div id="album-body" class="alb-body"><div class="loading">読み込み中...</div></div></div>
   <div class="bnav">
     <div class="bnav-i" onclick="goTo('camera')"><span class="ico bnav-ico" data-icon="camera"></span><span>撮影</span></div>
     <div class="bnav-i" onclick="goTo('home')"><span class="ico bnav-ico" data-icon="home"></span><span>ホーム</span></div>
@@ -1154,9 +1253,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
     <div id="cam-placeholder" class="cam-ph"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><div class="cam-ph-t">カメラを起動中...</div></div>
     <div id="cam-flash" style="position:absolute;inset:0;background:#fff;z-index:50;opacity:0;pointer-events:none;transition:opacity .1s"></div>
     <div class="cam-top"><div><div style="color:rgba(255,255,255,.6);font-size:11px">旅行中</div><div id="cam-trip-name" class="cam-tn">--</div></div></div>
+    <div id="cam-rec-indicator" class="cam-rec" style="display:none"><div class="cam-rec-dot"></div><span>REC</span></div>
+    <div class="cam-modes">
+      <div class="cam-mode-btn on" data-mode="photo" onclick="setCamMode('photo')">写真</div>
+      <div class="cam-mode-btn" data-mode="dual" onclick="setCamMode('dual')">デュアル</div>
+      <div class="cam-mode-btn" data-mode="video" onclick="setCamMode('video')">動画</div>
+    </div>
     <div class="cam-ctrl">
       <button class="cam-flip" id="cam-flip-btn" onclick="flipCamera()"></button>
-      <div class="cam-shut" onclick="takePhoto()"></div>
+      <div class="cam-shut" onmousedown="onShutterDown()" onmouseup="onShutterUp()" ontouchstart="onShutterDown()" ontouchend="onShutterUp()"></div>
       <div id="cam-last-photo" class="cam-gal" style="background:#333"></div>
     </div>
   </div>
@@ -1167,13 +1272,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
   </div>
 </div>
 
-<!-- CHAT (Firestoreから動的表示) -->
+<!-- CHAT -->
 <div id="screen-chat" class="screen">
   <div class="sb b"><span>9:41</span><span style="font-size:13px">5G</span></div>
-  <div class="nhdr"><span class="nhdr-back" onclick="goTo('map')" id="chat-back-btn"></span><div id="chat-trip-name" class="nhdr-t">チャット</div><div class="nhdr-r" onclick="goTo('members')" id="chat-users-btn"></div></div>
-  <div id="chat-messages" class="chat-s scroll">
-    <div class="loading">読み込み中...</div>
-  </div>
+  <div class="nhdr"><span class="nhdr-back" onclick="goTo('trip-detail')" id="chat-back-btn"></span><div id="chat-trip-name" class="nhdr-t">チャット</div><div class="nhdr-r" onclick="goTo('members')" id="chat-users-btn"></div></div>
+  <div id="chat-messages" class="chat-s scroll"><div class="loading">読み込み中...</div></div>
   <div class="chat-bar">
     <button class="chat-att" id="chat-clip-btn"></button>
     <input id="chat-input-box" class="chat-inp" placeholder="メッセージを入力..." onkeydown="if(event.key==='Enter')sendChat()">
@@ -1182,15 +1285,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
   </div>
 </div>
 
-<!-- MEMBERS (Firestoreから動的表示) -->
+<!-- MEMBERS -->
 <div id="screen-members" class="screen">
   <div class="sb b"><span>9:41</span><span style="font-size:13px">5G</span></div>
-  <div class="nhdr"><span class="nhdr-back" onclick="goTo('map')" id="mem-back-btn"></span><div class="nhdr-t">メンバー</div><div class="nhdr-r"></div></div>
+  <div class="nhdr"><span class="nhdr-back" onclick="goTo('trip-detail')" id="mem-back-btn"></span><div class="nhdr-t">メンバー</div><div class="nhdr-r"></div></div>
   <div class="scroll"><div class="mem-body">
     <div class="gps-row"><div><div class="gps-l"><span class="ico" id="ico-gps"></span>GPS位置情報共有</div><div class="gps-sub">旅行中のみ仲間に位置情報を公開</div></div><div class="toggle-lg"></div></div>
-    <div id="members-list" class="mem-card">
-      <div class="loading">読み込み中...</div>
-    </div>
+    <div id="members-list" class="mem-card"><div class="loading">読み込み中...</div></div>
     <div class="qr-box"><div style="font-size:15px;font-weight:700;color:var(--text)">仲間を招待</div><div class="qr-placeholder"><span class="ico" id="ico-qr"></span></div><div class="qr-label">QRコードをスキャンして参加<br>または招待リンクをシェア</div><button class="copy-link"><span class="ico" id="ico-link-copy"></span>招待リンクをコピー</button></div>
     <button class="btn btn-blue-out">LINEで招待する</button>
   </div></div>
@@ -1207,13 +1308,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
       <div id="prof-email" class="prof-email">--</div>
     </div>
     <div class="prof-section">
+      <div class="prof-section-h">アカウント</div>
       <div class="prof-item" onclick="goTo('home')"><span class="ico prof-ico" data-icon="image"></span><div class="prof-item-t">旅行一覧</div><span class="ico prof-arrow" data-icon="right"></span></div>
-      <div class="prof-item"><span class="ico prof-ico" data-icon="bell"></span><div class="prof-item-t">通知設定</div><span class="ico prof-arrow" data-icon="right"></span></div>
-      <div class="prof-item"><span class="ico prof-ico" data-icon="gps"></span><div class="prof-item-t">位置情報設定</div><span class="ico prof-arrow" data-icon="right"></span></div>
+      <div class="prof-item"><span class="ico prof-ico" data-icon="user"></span><div class="prof-item-t">プロフィール編集</div><span class="ico prof-arrow" data-icon="right"></span></div>
+      <div class="prof-item"><span class="ico prof-ico" data-icon="link"></span><div class="prof-item-t">アカウント連携</div><span class="ico prof-arrow" data-icon="right"></span></div>
     </div>
     <div class="prof-section">
-      <div class="prof-item"><span class="ico prof-ico" data-icon="link"></span><div class="prof-item-t">アカウント連携</div><span class="ico prof-arrow" data-icon="right"></span></div>
+      <div class="prof-section-h">設定</div>
+      <div class="prof-item"><span class="ico prof-ico" data-icon="bell"></span><div class="prof-item-t">通知設定</div><span class="ico prof-arrow" data-icon="right"></span></div>
+      <div class="prof-item"><span class="ico prof-ico" data-icon="gps"></span><div class="prof-item-t">位置情報・プライバシー</div><span class="ico prof-arrow" data-icon="right"></span></div>
+      <div class="prof-item"><span class="ico prof-ico" data-icon="camera"></span><div class="prof-item-t">写真の保存設定</div><span class="ico prof-arrow" data-icon="right"></span></div>
+    </div>
+    <div class="prof-section">
+      <div class="prof-section-h">その他</div>
       <div class="prof-item"><span class="ico prof-ico" data-icon="users"></span><div class="prof-item-t">招待した友達</div><span class="ico prof-arrow" data-icon="right"></span></div>
+      <div class="prof-item"><span class="ico prof-ico" data-icon="chat"></span><div class="prof-item-t">お問い合わせ</div><span class="ico prof-arrow" data-icon="right"></span></div>
     </div>
     <div class="prof-section">
       <div class="prof-item logout" onclick="fbLogout()"><span class="ico prof-ico" style="color:#FF453A" data-icon="back"></span><div class="prof-item-t" style="color:#FF453A">ログアウト</div></div>
@@ -1273,16 +1382,15 @@ utensils:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-widt
 mountain:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3l4 8 5-5 5 15H2L8 3z"/></svg>`,
 waves:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2 0 2.5 2 4.5 2s2.5-2 4.5-2c1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2 0 2.5 2 4.5 2s2.5-2 4.5-2c1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2 0 2.5 2 4.5 2s2.5-2 4.5-2c1.3 0 1.9.5 2.5 1"/></svg>`,
 trophy:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 22V18a2 2 0 0 1 4 0v4"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>`,
+more:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>`,
 };
-// Make I global for module script
 window.I = I;
 
 // ===== アイコン注入 =====
 document.addEventListener('DOMContentLoaded', () => {
-  // ID指定のアイコン
   const iconMap = {
     'btn-bell': 'bell', 'btn-user': 'user',
-    'map-back-btn': 'back', 'map-users-btn': 'users', 'map-cam-btn': 'camera',
+    'td-back-ico': 'back', 'td-more-btn': 'more', 'td-add-ico': 'plus', 'td-gps-ico': 'gps',
     'sched-back-btn': 'back', 'sched-prev-btn': 'left', 'sched-next-btn': 'right',
     'cr-back-btn': 'back', 'cr-cam-btn': 'camera',
     'cam-flip-btn': 'flip',
@@ -1293,7 +1401,6 @@ document.addEventListener('DOMContentLoaded', () => {
   for (const [id, name] of Object.entries(iconMap)) {
     const el = document.getElementById(id);
     if (el) {
-      // ボタンの場合はicoスパンを挿入
       if (el.tagName === 'BUTTON' || el.tagName === 'DIV') {
         if (!el.querySelector('.ico')) {
           const span = document.createElement('span');
@@ -1317,27 +1424,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el) el.innerHTML = `<span class="ico" style="width:24px;height:24px">${I[icon]}</span><span>${label}</span>`;
   }
 
-  // Trip inner nav
+  // Trip detail inner nav
   const tiMap = {
-    'ti-chat-map': ['chat', 'チャット'], 'ti-photo-map': ['camera', '写真'],
-    'ti-map-map': ['map', '地図'], 'ti-album-map': ['image', 'アルバム'], 'ti-sched-map': ['calendar', '予定']
+    'ti-chat': ['chat', 'チャット'], 'ti-photo': ['camera', '写真'],
+    'ti-cam': ['camera', 'カメラ'], 'ti-album': ['image', 'アルバム'], 'ti-sched': ['calendar', '予定']
   };
   for (const [id, [icon, label]] of Object.entries(tiMap)) {
     const el = document.getElementById(id);
     if (el) el.innerHTML = `<span class="ico" style="width:22px;height:22px">${I[icon]}</span><span>${label}</span>`;
   }
 
-  // data-icon 属性のアイコン
+  // data-icon
   document.querySelectorAll('[data-icon]').forEach(el => {
     el.innerHTML = I[el.dataset.icon] || '';
   });
-
-  // bnav-ico
   document.querySelectorAll('.bnav-ico').forEach(el => {
     el.innerHTML = I[el.dataset.icon] || '';
   });
 
-  // 世界タブタイトルにトロフィーアイコン
   const rankTitle = document.getElementById("world-rank-title");
   if (rankTitle) rankTitle.innerHTML = `<span class="ico" style="width:20px;height:20px;color:#F59E0B">${I.trophy}</span>今週の人気スポット`;
 });
@@ -1352,7 +1456,6 @@ function homeTab(tab, el) {
 
 // ===== モーダル =====
 function showModal() {
-  // デフォルト日付を今日に
   const today = new Date().toISOString().split('T')[0];
   const end = new Date(Date.now() + 2*86400000).toISOString().split('T')[0];
   document.getElementById('inp-trip-start').value = today;
@@ -1377,15 +1480,12 @@ async function submitCreate() {
     if (window.createTripFB) {
       await window.createTripFB(name, start, end, selectedCover);
       console.log("旅行作成完了:", name);
-    } else {
-      console.error("createTripFBが未定義");
     }
   } catch(e) {
     console.error("旅行作成エラー:", e);
     alert("作成に失敗しました: " + e.message);
   }
   hideModal();
-  // ホーム画面に留まる（onSnapshotが自動でリスト更新する）
 }
 
 // ===== チャット送信 =====
@@ -1414,15 +1514,6 @@ function schedNext() {
   d.setDate(d.getDate() + 1);
   const newDate = d.toISOString().split('T')[0];
   window.startWatchingSchedules(window._currentTripId, newDate);
-}
-
-// ===== シャッターエフェクト =====
-function shutterFx() {
-  const v = document.querySelector('.cam-view');
-  const f = document.createElement('div');
-  f.style.cssText = 'position:absolute;inset:0;background:#fff;z-index:50;animation:flash .25s ease forwards;';
-  v.appendChild(f);
-  setTimeout(() => f.remove(), 300);
 }
 
 // ===== 時計更新 =====
