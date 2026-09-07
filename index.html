@@ -271,13 +271,19 @@ window.sendMsgFB = async (tripId, text) => {
 // ===== 旅行一覧をリアルタイム監視 =====
 function startWatchingTrips(uid) {
   if (unsubTrips) unsubTrips();
+  // 複合インデックス不要にするためorderByなし、JS側でソート
   const q = query(
     collection(db, "trips"),
-    where("memberUids", "array-contains", uid),
-    orderBy("createdAt", "desc")
+    where("memberUids", "array-contains", uid)
   );
   unsubTrips = onSnapshot(q, (snap) => {
     const trips = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // 新しい順にソート
+    trips.sort((a, b) => {
+      const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+      const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+      return tb - ta;
+    });
     window._trips = trips;
     renderTripList(trips);
   }, (err) => {
@@ -289,7 +295,7 @@ function startWatchingTrips(uid) {
 // ===== 公開投稿を監視（世界タブ） =====
 function startWatchingPublicPosts() {
   if (unsubPublicPosts) unsubPublicPosts();
-  const q = query(collection(db, "public_posts"), orderBy("likes", "desc"));
+  const q = query(collection(db, "public_posts"));
   unsubPublicPosts = onSnapshot(q, (snap) => {
     const posts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderWorldTab(posts);
@@ -320,12 +326,14 @@ window.openTrip = (tripId) => {
 // ===== メッセージ監視 =====
 function startWatchingMessages(tripId) {
   if (unsubMessages) unsubMessages();
-  const q = query(
-    collection(db, "trips", tripId, "messages"),
-    orderBy("sentAt", "asc")
-  );
+  const q = query(collection(db, "trips", tripId, "messages"));
   unsubMessages = onSnapshot(q, (snap) => {
     const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    msgs.sort((a, b) => {
+      const ta = a.sentAt?.toDate ? a.sentAt.toDate().getTime() : 0;
+      const tb = b.sentAt?.toDate ? b.sentAt.toDate().getTime() : 0;
+      return ta - tb;
+    });
     renderMessages(msgs);
   });
 }
@@ -333,12 +341,14 @@ function startWatchingMessages(tripId) {
 // ===== 写真監視 =====
 function startWatchingPhotos(tripId) {
   if (unsubPhotos) unsubPhotos();
-  const q = query(
-    collection(db, "trips", tripId, "photos"),
-    orderBy("takenAt", "desc")
-  );
+  const q = query(collection(db, "trips", tripId, "photos"));
   unsubPhotos = onSnapshot(q, (snap) => {
     const photos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    photos.sort((a, b) => {
+      const ta = a.takenAt?.toDate ? a.takenAt.toDate().getTime() : 0;
+      const tb = b.takenAt?.toDate ? b.takenAt.toDate().getTime() : 0;
+      return tb - ta;
+    });
     window._currentPhotos = photos;
     renderPhotoGrid(photos);
     renderAlbum(photos);
@@ -351,11 +361,11 @@ function startWatchingSchedules(tripId, date) {
   window._currentSchedDate = date;
   const q = query(
     collection(db, "trips", tripId, "schedules"),
-    where("date", "==", date),
-    orderBy("time", "asc")
+    where("date", "==", date)
   );
   unsubSchedules = onSnapshot(q, (snap) => {
     const scheds = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    scheds.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
     renderSchedule(scheds, date);
   });
 }
@@ -403,6 +413,9 @@ window.renderWorldTab = (posts) => {
   const rankEl = document.getElementById("world-rank-list");
   const feedEl = document.getElementById("world-feed");
   if (!rankEl || !feedEl) return;
+
+  // likes順にソート
+  posts.sort((a, b) => (b.likes || 0) - (a.likes || 0));
 
   // ランキング（上位3件）
   const rankColors = ["g", "s", "br"];
@@ -1214,10 +1227,19 @@ async function submitCreate() {
   const name = document.getElementById('inp-trip-name').value || "新しい旅行";
   const start = document.getElementById('inp-trip-start').value;
   const end = document.getElementById('inp-trip-end').value;
-  if (window.createTripFB) {
-    await window.createTripFB(name, start, end, selectedCover);
+  try {
+    if (window.createTripFB) {
+      await window.createTripFB(name, start, end, selectedCover);
+      console.log("旅行作成完了:", name);
+    } else {
+      console.error("createTripFBが未定義");
+    }
+  } catch(e) {
+    console.error("旅行作成エラー:", e);
+    alert("作成に失敗しました: " + e.message);
   }
   hideModal();
+  // ホーム画面に留まる（onSnapshotが自動でリスト更新する）
 }
 
 // ===== チャット送信 =====
