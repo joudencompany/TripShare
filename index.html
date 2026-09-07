@@ -621,7 +621,7 @@ window.startWatchingSchedules = startWatchingSchedules;
 function goTo(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const screens = {'splash':'screen-splash','home':'screen-home','map':'screen-map','schedule':'screen-schedule',
-    'camera-roll':'screen-camera-roll','album':'screen-album','camera':'screen-camera','chat':'screen-chat','members':'screen-members'};
+    'camera-roll':'screen-camera-roll','album':'screen-album','camera':'screen-camera','chat':'screen-chat','members':'screen-members','profile':'screen-profile'};
   const el = document.getElementById(screens[id]);
   if (el) el.classList.add('active');
 
@@ -633,6 +633,111 @@ function goTo(id) {
       if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;
     }, 100);
   }
+  if (id === 'camera') startCamera();
+  if (id !== 'camera') stopCamera();
+  if (id === 'profile') renderProfile();
+  // アルバムをホームのbnavから開いた場合、最初の旅行を自動選択
+  if (id === 'album' && !window._currentTrip && window._trips?.length) {
+    const t = window._trips[0];
+    window._currentTrip = t;
+    window._currentTripId = t.id;
+    if (typeof window.startWatchingPhotosForAlbum === 'function') window.startWatchingPhotosForAlbum(t.id);
+  }
+  if (id === 'album' && window._currentPhotos) {
+    renderAlbum(window._currentPhotos);
+  }
+}
+
+// ===== カメラ =====
+let camStream = null;
+let camFacingMode = 'environment';
+
+async function startCamera() {
+  const video = document.getElementById('cam-video');
+  const ph = document.getElementById('cam-placeholder');
+  if (!video) return;
+  try {
+    if (camStream) { camStream.getTracks().forEach(t => t.stop()); }
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: camFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    video.srcObject = camStream;
+    if (ph) ph.style.display = 'none';
+    // 旅行名を表示
+    const tn = document.getElementById('cam-trip-name');
+    if (tn && window._currentTrip) tn.textContent = window._currentTrip.name;
+  } catch(e) {
+    console.error('カメラ起動エラー:', e);
+    if (ph) { ph.querySelector('.cam-ph-t').textContent = 'カメラを使用できません'; }
+  }
+}
+
+function stopCamera() {
+  if (camStream) {
+    camStream.getTracks().forEach(t => t.stop());
+    camStream = null;
+  }
+  const video = document.getElementById('cam-video');
+  if (video) video.srcObject = null;
+}
+
+function flipCamera() {
+  camFacingMode = camFacingMode === 'environment' ? 'user' : 'environment';
+  startCamera();
+}
+
+function renderProfile() {
+  const user = window._fbUser;
+  if (!user) return;
+  const av = document.getElementById('prof-avatar');
+  const nm = document.getElementById('prof-name');
+  const em = document.getElementById('prof-email');
+  if (nm) nm.textContent = user.displayName || 'User';
+  if (em) em.textContent = user.email || '';
+  if (av) {
+    if (user.photoURL) {
+      av.innerHTML = `<img src="${user.photoURL}" alt="">`;
+    } else {
+      av.textContent = (user.displayName || 'U').charAt(0);
+    }
+  }
+  // プロフィール画面のアイコン注入
+  document.querySelectorAll('#screen-profile [data-icon]').forEach(el => {
+    el.innerHTML = I[el.dataset.icon] || '';
+  });
+}
+
+function takePhoto() {
+  const video = document.getElementById('cam-video');
+  const canvas = document.getElementById('cam-canvas');
+  const flash = document.getElementById('cam-flash');
+  if (!video || !canvas || !video.videoWidth) return;
+
+  // フラッシュ演出
+  if (flash) { flash.style.opacity = '1'; setTimeout(() => { flash.style.opacity = '0'; }, 150); }
+
+  // キャプチャ
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  if (camFacingMode === 'user') {
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+  // サムネイルを更新
+  const lastPhoto = document.getElementById('cam-last-photo');
+  if (lastPhoto) {
+    lastPhoto.style.backgroundImage = `url(${dataUrl})`;
+    lastPhoto.style.backgroundSize = 'cover';
+    lastPhoto.style.backgroundPosition = 'center';
+  }
+
+  console.log('写真を撮影しました（サイズ:', Math.round(dataUrl.length/1024), 'KB）');
+  // TODO: R2にアップロード → Firestoreに保存
 }
 </script>
 
@@ -811,10 +916,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .cam-ph{color:rgba(255,255,255,.12);text-align:center}.cam-ph .ico{width:64px;height:64px}.cam-ph-t{font-size:13px;color:rgba(255,255,255,.15);margin-top:8px}
 .cam-top{position:absolute;top:48px;left:0;right:0;padding:8px 20px;display:flex;align-items:center;justify-content:space-between;z-index:10}
 .cam-tn{font-size:15px;font-weight:600;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.6)}.cam-zoom{background:rgba(255,255,255,.12);color:rgba(255,255,255,.8);padding:5px 14px;border-radius:20px;font-size:13px;font-weight:500}
-.cam-pip{position:absolute;bottom:24px;left:16px;width:108px;height:78px;background:#e4e8ec;border-radius:12px;border:2px solid rgba(255,255,255,.5);overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.4)}
-.cam-modes{position:absolute;bottom:152px;left:0;right:0;display:flex;justify-content:center;gap:22px;z-index:10}
-.cam-m{font-size:13px;color:rgba(255,255,255,.4);font-weight:500;cursor:pointer;padding:4px 0;border-bottom:2px solid transparent;transition:all .2s}
-.cam-m.on{color:#FFD60A;border-color:#FFD60A;font-weight:600}
+.cam-view video{transform:scaleX(1)}
+.cam-view video.front{transform:scaleX(-1)}
 .cam-ctrl{position:absolute;bottom:50px;left:0;right:0;display:flex;align-items:center;justify-content:space-around;z-index:10}
 .cam-shut{width:72px;height:72px;border-radius:50%;background:#fff;border:5px solid rgba(255,255,255,.35);cursor:pointer;transition:transform .1s}
 .cam-shut:active{transform:scale(.92)}
@@ -874,6 +977,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .cover-add{width:56px;height:56px;border-radius:14px;border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .cover-add .ico{width:20px;height:20px;color:var(--text3)}
 
+/* ===== PROFILE ===== */
+.prof-body{padding:16px;display:flex;flex-direction:column;gap:14px}
+.prof-card{background:var(--surface);border-radius:20px;padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;box-shadow:var(--shadow)}
+.prof-av{width:72px;height:72px;border-radius:50%;font-size:28px;border:3px solid var(--pri-light);overflow:hidden}
+.prof-av img{width:100%;height:100%;object-fit:cover}
+.prof-name{font-size:20px;font-weight:700;color:var(--text)}
+.prof-email{font-size:13px;color:var(--text3)}
+.prof-section{background:var(--surface);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+.prof-item{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;border-bottom:1px solid var(--border)}
+.prof-item:last-child{border-bottom:none}
+.prof-item:active{background:var(--bg)}
+.prof-ico{width:20px;height:20px;color:var(--pri)}
+.prof-item-t{flex:1;font-size:15px;font-weight:500;color:var(--text)}
+.prof-arrow{width:16px;height:16px;color:var(--text3)}
+.prof-ver{text-align:center;font-size:12px;color:var(--text3);padding:12px 0}
+
 /* Loading spinner */
 .loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--text3);font-size:14px}
 @keyframes flash{0%{opacity:1}100%{opacity:0}}
@@ -905,7 +1024,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
       </div>
       <div class="home-icons">
         <button class="home-icon-btn" id="btn-bell"></button>
-        <button class="home-icon-btn" onclick="fbLogout()" id="btn-user"></button>
+        <button class="home-icon-btn" onclick="goTo('profile')" id="btn-user"></button>
       </div>
     </div>
   </div>
@@ -1030,14 +1149,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 <!-- CAMERA -->
 <div id="screen-camera" class="screen">
   <div class="cam-view">
-    <div class="cam-ph"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><div class="cam-ph-t">カメラ映像</div></div>
-    <div class="cam-top"><div><div style="color:rgba(255,255,255,.6);font-size:11px">旅行中</div><div id="cam-trip-name" class="cam-tn">--</div></div><div class="cam-zoom">1.0x</div></div>
-    <div class="cam-pip"><svg viewBox="0 0 108 78" style="width:100%;height:100%"><rect width="108" height="78" fill="#e4e8ec"/><text x="54" y="44" text-anchor="middle" fill="#999" font-size="10">MAP</text></svg></div>
-    <div class="cam-modes"><div class="cam-m">デュアル</div><div class="cam-m">3秒動画</div><div class="cam-m">バースト</div><div class="cam-m on">ノーマル</div></div>
+    <video id="cam-video" autoplay playsinline muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>
+    <canvas id="cam-canvas" style="display:none"></canvas>
+    <div id="cam-placeholder" class="cam-ph"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><div class="cam-ph-t">カメラを起動中...</div></div>
+    <div id="cam-flash" style="position:absolute;inset:0;background:#fff;z-index:50;opacity:0;pointer-events:none;transition:opacity .1s"></div>
+    <div class="cam-top"><div><div style="color:rgba(255,255,255,.6);font-size:11px">旅行中</div><div id="cam-trip-name" class="cam-tn">--</div></div></div>
     <div class="cam-ctrl">
-      <button class="cam-flip" id="cam-flip-btn"></button>
-      <div class="cam-shut" onclick="shutterFx()"></div>
-      <div class="cam-gal p9"></div>
+      <button class="cam-flip" id="cam-flip-btn" onclick="flipCamera()"></button>
+      <div class="cam-shut" onclick="takePhoto()"></div>
+      <div id="cam-last-photo" class="cam-gal" style="background:#333"></div>
     </div>
   </div>
   <div class="cam-bnav">
@@ -1073,6 +1193,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
     </div>
     <div class="qr-box"><div style="font-size:15px;font-weight:700;color:var(--text)">仲間を招待</div><div class="qr-placeholder"><span class="ico" id="ico-qr"></span></div><div class="qr-label">QRコードをスキャンして参加<br>または招待リンクをシェア</div><button class="copy-link"><span class="ico" id="ico-link-copy"></span>招待リンクをコピー</button></div>
     <button class="btn btn-blue-out">LINEで招待する</button>
+  </div></div>
+</div>
+
+<!-- PROFILE -->
+<div id="screen-profile" class="screen">
+  <div class="sb b"><span>9:41</span><span style="font-size:13px">5G</span></div>
+  <div class="nhdr"><span class="nhdr-back" onclick="goTo('home')" id="prof-back-btn"></span><div class="nhdr-t">プロフィール</div><div class="nhdr-r"></div></div>
+  <div class="scroll"><div class="prof-body">
+    <div class="prof-card">
+      <div id="prof-avatar" class="prof-av c4">?</div>
+      <div id="prof-name" class="prof-name">--</div>
+      <div id="prof-email" class="prof-email">--</div>
+    </div>
+    <div class="prof-section">
+      <div class="prof-item" onclick="goTo('home')"><span class="ico prof-ico" data-icon="image"></span><div class="prof-item-t">旅行一覧</div><span class="ico prof-arrow" data-icon="right"></span></div>
+      <div class="prof-item"><span class="ico prof-ico" data-icon="bell"></span><div class="prof-item-t">通知設定</div><span class="ico prof-arrow" data-icon="right"></span></div>
+      <div class="prof-item"><span class="ico prof-ico" data-icon="gps"></span><div class="prof-item-t">位置情報設定</div><span class="ico prof-arrow" data-icon="right"></span></div>
+    </div>
+    <div class="prof-section">
+      <div class="prof-item"><span class="ico prof-ico" data-icon="link"></span><div class="prof-item-t">アカウント連携</div><span class="ico prof-arrow" data-icon="right"></span></div>
+      <div class="prof-item"><span class="ico prof-ico" data-icon="users"></span><div class="prof-item-t">招待した友達</div><span class="ico prof-arrow" data-icon="right"></span></div>
+    </div>
+    <div class="prof-section">
+      <div class="prof-item logout" onclick="fbLogout()"><span class="ico prof-ico" style="color:#FF453A" data-icon="back"></span><div class="prof-item-t" style="color:#FF453A">ログアウト</div></div>
+    </div>
+    <div class="prof-ver">TripShare v0.1.0</div>
   </div></div>
 </div>
 
@@ -1141,7 +1287,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'cr-back-btn': 'back', 'cr-cam-btn': 'camera',
     'cam-flip-btn': 'flip',
     'chat-back-btn': 'back', 'chat-users-btn': 'users', 'chat-clip-btn': 'clip', 'chat-pin-btn': 'pin', 'chat-send-btn': 'send',
-    'mem-back-btn': 'back', 'ico-gps': 'gps', 'ico-qr': 'qr', 'ico-link-copy': 'link',
+    'mem-back-btn': 'back', 'ico-gps': 'gps', 'ico-qr': 'qr', 'ico-link-copy': 'link', 'prof-back-btn': 'back',
     'cover-add-btn': 'plus',
   };
   for (const [id, name] of Object.entries(iconMap)) {
