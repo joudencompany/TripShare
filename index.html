@@ -11,7 +11,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, query, where, orderBy,
-  onSnapshot, serverTimestamp, doc, setDoc, getDoc, getDocs }
+  onSnapshot, serverTimestamp, doc, setDoc, getDoc, getDocs, Timestamp, updateDoc, arrayUnion }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -49,6 +49,141 @@ let unsubPhotos = null;
 let unsubSchedules = null;
 let unsubPublicPosts = null;
 
+// ===== デモデータ自動投入 =====
+async function seedDemoData(user) {
+  const uid = user.uid;
+  const myName = user.displayName || "User";
+  const myAvatar = user.photoURL || "";
+  const myInitial = myName.charAt(0);
+
+  // 既にデモデータがあるかチェック
+  const check = await getDoc(doc(db, "trips", "trip_miyazaki"));
+  if (check.exists()) {
+    // 既にあるが自分がメンバーでない場合は追加
+    const data = check.data();
+    if (data.memberUids && !data.memberUids.includes(uid)) {
+      const tripIds = ["trip_miyazaki", "trip_kyoto", "trip_hokkaido"];
+      for (const tid of tripIds) {
+        try {
+          await updateDoc(doc(db, "trips", tid), {
+            memberUids: arrayUnion(uid),
+            members: arrayUnion({ uid, name: myName, avatar: myAvatar, role: "member", color: "c4", initial: myInitial })
+          });
+        } catch(e) { console.warn("デモ旅行への参加スキップ:", tid, e.message); }
+      }
+    }
+    return;
+  }
+
+  console.log("デモデータを投入中...");
+  const ts = (d) => Timestamp.fromDate(new Date(d));
+
+  // ダミーユーザー
+  const dummies = [
+    { uid: "dummy_sato", name: "佐藤 花子", email: "sato@example.com" },
+    { uid: "dummy_takahashi", name: "高橋 翔", email: "takahashi@example.com" },
+    { uid: "dummy_yamada", name: "山田 里奈", email: "yamada@example.com" },
+  ];
+  for (const u of dummies) {
+    await setDoc(doc(db, "users", u.uid), { ...u, avatar: "", createdAt: serverTimestamp() }, { merge: true });
+  }
+
+  // 旅行1: 宮崎旅行
+  const allUids = [uid, "dummy_sato", "dummy_takahashi", "dummy_yamada"];
+  await setDoc(doc(db, "trips", "trip_miyazaki"), {
+    name: "宮崎旅行", startDate: "2026-09-07", endDate: "2026-09-09", coverColor: "cov-m",
+    createdBy: uid, memberUids: allUids, isPublic: true, latestAction: "高橋さんが写真を追加",
+    members: [
+      { uid, name: myName, avatar: myAvatar, role: "owner", color: "c4", initial: myInitial },
+      { uid: "dummy_sato", name: "佐藤 花子", avatar: "", role: "member", color: "c1", initial: "佐" },
+      { uid: "dummy_takahashi", name: "高橋 翔", avatar: "", role: "member", color: "c3", initial: "高" },
+      { uid: "dummy_yamada", name: "山田 里奈", avatar: "", role: "member", color: "c5", initial: "山" },
+    ],
+    createdAt: serverTimestamp(),
+  });
+
+  // 旅行2: 女子旅 in 京都
+  await setDoc(doc(db, "trips", "trip_kyoto"), {
+    name: "女子旅 in 京都", startDate: "2026-08-05", endDate: "2026-08-07", coverColor: "cov-k",
+    createdBy: "dummy_sato", memberUids: [uid, "dummy_sato", "dummy_yamada"], isPublic: false,
+    latestAction: "佐藤さんがチャット送信",
+    members: [
+      { uid: "dummy_sato", name: "佐藤 花子", avatar: "", role: "owner", color: "c2", initial: "佐" },
+      { uid, name: myName, avatar: myAvatar, role: "member", color: "c5", initial: myInitial },
+      { uid: "dummy_yamada", name: "山田 里奈", avatar: "", role: "member", color: "c6", initial: "山" },
+    ],
+    createdAt: serverTimestamp(),
+  });
+
+  // 旅行3: 北海道卒業旅行
+  await setDoc(doc(db, "trips", "trip_hokkaido"), {
+    name: "北海道卒業旅行", startDate: "2026-07-20", endDate: "2026-07-23", coverColor: "cov-h",
+    createdBy: uid, memberUids: allUids, isPublic: false, latestAction: "全345枚",
+    members: [
+      { uid, name: myName, avatar: myAvatar, role: "owner", color: "c4", initial: myInitial },
+      { uid: "dummy_sato", name: "佐藤 花子", avatar: "", role: "member", color: "c1", initial: "佐" },
+      { uid: "dummy_takahashi", name: "高橋 翔", avatar: "", role: "member", color: "c3", initial: "高" },
+      { uid: "dummy_yamada", name: "山田 里奈", avatar: "", role: "member", color: "c2", initial: "山" },
+    ],
+    createdAt: serverTimestamp(),
+  });
+
+  // メッセージ（宮崎旅行）
+  const msgs = [
+    { senderId: uid, senderName: myName, text: "みんな集合! 今どこ?", sentAt: ts("2026-09-07T09:02:00") },
+    { senderId: "dummy_sato", senderName: "佐藤 花子", text: "もうすぐ着くよ! 5分待って", sentAt: ts("2026-09-07T09:04:00") },
+    { senderId: "dummy_takahashi", senderName: "高橋 翔", text: "青島神社すごくきれいだった!", sentAt: ts("2026-09-07T10:47:00") },
+    { senderId: "dummy_yamada", senderName: "山田 里奈", text: "いい写真!", sentAt: ts("2026-09-07T10:50:00") },
+    { senderId: uid, senderName: myName, text: "次は堀切峠行こう!", sentAt: ts("2026-09-07T11:05:00") },
+    { senderId: "dummy_sato", senderName: "佐藤 花子", text: "チキン南蛮食べたい!", sentAt: ts("2026-09-07T12:15:00") },
+  ];
+  for (const m of msgs) {
+    await addDoc(collection(db, "trips", "trip_miyazaki", "messages"), { ...m, type: "text", senderAvatar: "" });
+  }
+
+  // スケジュール（宮崎旅行）
+  const scheds = [
+    { title: "宮崎駅", description: "集合・荷物を預ける", date: "2026-09-07", time: "09:00", icon: "train" },
+    { title: "青島神社", description: "参拝・鬼の洗濯板を見学", date: "2026-09-07", time: "10:30", icon: "landmark" },
+    { title: "昼食", description: "チキン南蛮・冷汁を食べる", date: "2026-09-07", time: "12:30", icon: "utensils" },
+    { title: "堀切峠", description: "絶景ポイント・写真撮影", date: "2026-09-07", time: "14:00", icon: "mountain" },
+    { title: "海岸を散歩", description: "白浜海岸・夕日鑑賞", date: "2026-09-07", time: "15:30", icon: "waves" },
+  ];
+  for (const s of scheds) {
+    await addDoc(collection(db, "trips", "trip_miyazaki", "schedules"), { ...s, createdBy: uid, createdAt: serverTimestamp() });
+  }
+
+  // 写真メタデータ（宮崎旅行）
+  const colors = ["p1","p2","p3","p4","p5","p6","p7","p8","p9","p10","p11","p12"];
+  const uploaders = [
+    { uid, name: myName, color: "c4", initial: myInitial },
+    { uid: "dummy_sato", name: "佐藤 花子", color: "c1", initial: "佐" },
+    { uid: "dummy_takahashi", name: "高橋 翔", color: "c3", initial: "高" },
+    { uid: "dummy_yamada", name: "山田 里奈", color: "c5", initial: "山" },
+  ];
+  const times = ["09:12","09:36","10:05","10:18","11:22","12:07","12:36","13:44","14:12","14:55","15:30","16:02"];
+  for (let i = 0; i < 12; i++) {
+    const up = uploaders[i % 4];
+    await addDoc(collection(db, "trips", "trip_miyazaki", "photos"), {
+      r2Url: "", thumbUrl: "", placeholderColor: colors[i],
+      uploaderUid: up.uid, uploaderName: up.name, uploaderColor: up.color, uploaderInitial: up.initial,
+      caption: "", takenAt: ts(`2026-09-07T${times[i]}:00`), location: null,
+    });
+  }
+
+  // 公開投稿
+  const posts = [
+    { title: "宮崎を満喫する2泊3日", location: "宮崎県・青島神社・日南海岸", coverColor: "cov-m", likes: 1271, views: 1728, photoCount: 45 },
+    { title: "京都グルメ旅行", location: "京都府・嵐山・清水寺", coverColor: "cov-k", likes: 842, views: 2103, photoCount: 89 },
+    { title: "沖縄リゾート3日間", location: "沖縄県・美ら海・瀬長島", coverColor: "p12", likes: 619, views: 1456, photoCount: 67 },
+  ];
+  for (const p of posts) {
+    await addDoc(collection(db, "public_posts"), { ...p, authorId: uid, createdAt: serverTimestamp() });
+  }
+
+  console.log("デモデータ投入完了!");
+}
+
 // ===== ログイン状態監視 =====
 onAuthStateChanged(auth, async (user) => {
   if (user) {
@@ -60,7 +195,9 @@ onAuthStateChanged(auth, async (user) => {
       if (!snap.exists()) {
         await setDoc(userRef, { uid: user.uid, name: user.displayName||"User", email: user.email, avatar: user.photoURL||"", createdAt: serverTimestamp() });
       }
-    } catch(e) { console.warn("Firestore書込みスキップ:", e.message); }
+      // デモデータ自動投入
+      await seedDemoData(user);
+    } catch(e) { console.warn("Firestore処理スキップ:", e.message); }
 
     // ホーム画面へ遷移
     const splash = document.getElementById("screen-splash");
@@ -534,6 +671,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .splash-top{flex:1}
 .splash-btns{width:100%;padding-bottom:60px;display:flex;flex-direction:column;gap:12px}
 .splash-status{text-align:center;font-size:13px;color:rgba(255,255,255,.7);margin-top:6px;min-height:18px}
+/* ログイン画面ボタンは元のスタイルを維持 */
+#screen-splash .btn-pri{background:#0A84FF;box-shadow:none}
+#screen-splash .btn-out{background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.5);backdrop-filter:blur(8px)}
 
 /* ===== HOME ===== */
 #screen-home{background:var(--bg)}
