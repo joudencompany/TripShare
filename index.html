@@ -437,6 +437,14 @@ window.renderPhotoGrid = (photos) => {
 };
 
 // --- アルバム ---
+window._albumTab = 'member';
+window.switchAlbumTab = (tab, el) => {
+  document.querySelectorAll('.alb-tab').forEach(t => t.classList.remove('on'));
+  if (el) el.classList.add('on');
+  window._albumTab = tab;
+  if (window._currentPhotos) renderAlbum(window._currentPhotos);
+};
+
 window.renderAlbum = (photos) => {
   const el = document.getElementById("album-body");
   const statsEl = document.getElementById("album-stats");
@@ -455,25 +463,61 @@ window.renderAlbum = (photos) => {
     const myCount = photos.filter(p => p.uploaderUid === window._fbUser?.uid).length;
     statsEl.innerHTML = `<div class="alb-s">全 <span>${photos.length}</span> 枚</div><div class="alb-s">あなた <span>${myCount}</span> 枚</div>`;
   }
-  const byDate = {};
-  photos.forEach(p => {
-    const d = p.takenAt?.toDate ? p.takenAt.toDate().toLocaleDateString("ja-JP") : "不明";
-    if (!byDate[d]) byDate[d] = [];
-    byDate[d].push(p);
-  });
+
+  const tab = window._albumTab || 'member';
   let html = "";
-  let dayNum = 1;
-  for (const [date, dayPhotos] of Object.entries(byDate)) {
-    html += `<div class="day-sec"><div class="day-label">Day ${dayNum} (${date})</div><div class="day-grid">`;
-    for (const p of dayPhotos) {
-      const fill = p.r2Url
-        ? `<img class="fill" src="${p.r2Url}" style="width:100%;height:100%;object-fit:cover">`
-        : `<div class="fill ${p.placeholderColor || 'p1'}"></div>`;
-      html += `<div class="day-p">${fill}<div class="av day-av ${p.uploaderColor || 'c4'}">${p.uploaderInitial || '?'}</div></div>`;
-    }
-    html += `</div></div>`;
-    dayNum++;
+
+  function photoTile(p) {
+    const fill = p.r2Url
+      ? `<img class="fill" src="${p.r2Url}" style="width:100%;height:100%;object-fit:cover">`
+      : `<div class="fill ${p.placeholderColor || 'p1'}"></div>`;
+    return `<div class="day-p">${fill}<div class="av day-av ${p.uploaderColor || 'c4'}">${p.uploaderInitial || '?'}</div></div>`;
   }
+
+  if (tab === 'member') {
+    // メンバー別にグループ化
+    const byMember = {};
+    photos.forEach(p => {
+      const name = p.uploaderName || "不明";
+      if (!byMember[name]) byMember[name] = [];
+      byMember[name].push(p);
+    });
+    for (const [name, memberPhotos] of Object.entries(byMember)) {
+      html += `<div class="day-sec"><div class="day-label">${esc(name)} (${memberPhotos.length}枚)</div><div class="day-grid">`;
+      html += memberPhotos.map(photoTile).join('');
+      html += `</div></div>`;
+    }
+  } else if (tab === 'place') {
+    // 場所別（locationがなければ時間帯で仮グループ化）
+    const byPlace = {};
+    photos.forEach(p => {
+      const loc = p.location || "場所未設定";
+      const key = typeof loc === 'string' ? loc : (loc.name || "場所未設定");
+      if (!byPlace[key]) byPlace[key] = [];
+      byPlace[key].push(p);
+    });
+    for (const [place, placePhotos] of Object.entries(byPlace)) {
+      html += `<div class="day-sec"><div class="day-label">${esc(place)} (${placePhotos.length}枚)</div><div class="day-grid">`;
+      html += placePhotos.map(photoTile).join('');
+      html += `</div></div>`;
+    }
+  } else {
+    // 日付別
+    const byDate = {};
+    photos.forEach(p => {
+      const d = p.takenAt?.toDate ? p.takenAt.toDate().toLocaleDateString("ja-JP") : "不明";
+      if (!byDate[d]) byDate[d] = [];
+      byDate[d].push(p);
+    });
+    let dayNum = 1;
+    for (const [date, dayPhotos] of Object.entries(byDate)) {
+      html += `<div class="day-sec"><div class="day-label">Day ${dayNum} (${date})</div><div class="day-grid">`;
+      html += dayPhotos.map(photoTile).join('');
+      html += `</div></div>`;
+      dayNum++;
+    }
+  }
+
   el.innerHTML = html || '<div style="padding:40px;text-align:center;color:#999">写真はまだありません</div>';
 };
 
@@ -540,6 +584,16 @@ function formatDateRange(s, e) {
 
 window.goTo = goTo;
 window.startWatchingSchedules = startWatchingSchedules;
+window.startCamera = startCamera;
+window.stopCamera = stopCamera;
+window.flipCamera = flipCamera;
+window.takePhoto = takePhoto;
+window.takeDualPhoto = takeDualPhoto;
+window.setCamMode = setCamMode;
+window.onShutterDown = onShutterDown;
+window.onShutterUp = onShutterUp;
+window.startVideoRecording = startVideoRecording;
+window.stopVideoRecording = stopVideoRecording;
 
 function goTo(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -589,12 +643,18 @@ async function startCamera() {
       audio: false
     });
     video.srcObject = camStream;
+    await video.play();
     if (ph) ph.style.display = 'none';
+    video.style.display = 'block';
     const tn = document.getElementById('cam-trip-name');
     if (tn && window._currentTrip) tn.textContent = window._currentTrip.name;
   } catch(e) {
     console.error('カメラ起動エラー:', e);
-    if (ph) { ph.querySelector('.cam-ph-t').textContent = 'カメラを使用できません'; }
+    if (ph) {
+      ph.style.display = '';
+      const pht = ph.querySelector('.cam-ph-t');
+      if (pht) pht.textContent = 'カメラを使用できません: ' + e.message;
+    }
   }
 }
 
@@ -1236,7 +1296,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
     <div id="album-name" class="alb-name">読み込み中...</div>
     <div id="album-members" class="alb-row"></div>
     <div id="album-stats" class="alb-stats"></div>
-    <div class="alb-tabs"><div class="alb-tab on">メンバー</div><div class="alb-tab">場所</div><div class="alb-tab">日付</div></div>
+    <div class="alb-tabs"><div class="alb-tab on" onclick="switchAlbumTab('member',this)">メンバー</div><div class="alb-tab" onclick="switchAlbumTab('place',this)">場所</div><div class="alb-tab" onclick="switchAlbumTab('date',this)">日付</div></div>
   </div>
   <div class="scroll"><div id="album-body" class="alb-body"><div class="loading">読み込み中...</div></div></div>
   <div class="bnav">
