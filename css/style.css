@@ -144,7 +144,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 /* ===== TRIP DETAIL (New Design) ===== */
 #screen-trip-detail{background:var(--bg);display:flex;flex-direction:column}
 .td-cover-wrap{position:relative;flex-shrink:0}
-.td-cover{width:100%;height:280px;position:relative;display:flex;align-items:flex-end}
+.td-cover{width:100%;height:340px;position:relative;display:flex;align-items:flex-end;background-size:cover;background-position:center}
 .td-cover-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.1) 0%,rgba(0,0,0,.45) 100%)}
 .td-back-btn{position:absolute;top:50px;left:16px;z-index:10;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.25);backdrop-filter:blur(8px);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .td-back-btn .ico{width:20px;height:20px;color:#fff}
@@ -422,3 +422,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .map-mem-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
 .map-mem-item:last-child{border-bottom:none}
 .map-mem-loc{font-size:12px;color:var(--text3)}
+
+/* ===== RESPONSIVE (Mobile fullscreen) ===== */
+@media (max-width: 500px) {
+  body{padding:0;background:var(--bg)}
+  #phone{width:100%;height:100vh;height:100dvh;border-radius:0;box-shadow:none}
+  .td-cover{height:45vh}
+  .td-back-btn{top:env(safe-area-inset-top,44px)}
+  .td-more-btn{top:env(safe-area-inset-top,44px)}
+}

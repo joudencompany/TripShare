@@ -99,10 +99,14 @@ onAuthStateChanged(auth, async (user) => {
 
     const splash = document.getElementById("screen-splash");
     if (splash && splash.classList.contains("active")) {
-      // ログイン済み → splashをスキップして即座にhomeへ遷移
-      goTo("home");
-      startWatchingTrips(user.uid);
-      startWatchingPublicPosts();
+      // ログイン済み → splashを1.5秒表示してからhomeへ遷移
+      const st = document.getElementById("splash-status");
+      if (st) st.textContent = user.displayName + " でログイン中...";
+      setTimeout(() => {
+        goTo("home");
+        startWatchingTrips(user.uid);
+        startWatchingPublicPosts();
+      }, 1500);
     }
   } else {
     window._fbUser = null;
@@ -423,13 +427,10 @@ function esc(s) {
 function formatDateRange(s, e) {
   if (!s) return "";
   const sd = new Date(s + "T00:00:00");
-  const fmt = (d) => `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
-  if (!e) return fmt(sd);
+  const fmtJP = (d) => `${d.getMonth()+1}月${d.getDate()}日`;
+  if (!e) return fmtJP(sd);
   const ed = new Date(e + "T00:00:00");
-  if (sd.getFullYear() === ed.getFullYear() && sd.getMonth() === ed.getMonth()) {
-    return `${fmt(sd)} - ${ed.getMonth()+1}/${ed.getDate()}`;
-  }
-  return `${fmt(sd)} - ${fmt(ed)}`;
+  return `${fmtJP(sd)} - ${fmtJP(ed)}`;
 }
 
 // ============================================================
