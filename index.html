@@ -8,27 +8,27 @@
 <!-- Leaflet CSS (for Map) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
-<!-- App CSS -->
-<link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/chat.css">
-<link rel="stylesheet" href="css/camera.css">
-<link rel="stylesheet" href="css/schedule.css">
+<!-- App CSS (cache bust) -->
+<link rel="stylesheet" href="css/style.css?v=3">
+<link rel="stylesheet" href="css/chat.css?v=3">
+<link rel="stylesheet" href="css/camera.css?v=3">
+<link rel="stylesheet" href="css/schedule.css?v=3">
 
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <!-- Icons (must load first) -->
-<script src="js/icons.js"></script>
+<script src="js/icons.js?v=3"></script>
 
 <!-- Firebase Module: Auth + Firestore + Navigation -->
-<script type="module" src="js/app.js"></script>
+<script type="module" src="js/app.js?v=3"></script>
 
 <!-- Feature Scripts (non-module, uses window globals) -->
-<script src="js/render.js" defer></script>
-<script src="js/chat.js" defer></script>
-<script src="js/camera.js" defer></script>
-<script src="js/schedule.js" defer></script>
-<script src="js/map.js" defer></script>
+<script src="js/render.js?v=3" defer></script>
+<script src="js/chat.js?v=3" defer></script>
+<script src="js/camera.js?v=3" defer></script>
+<script src="js/schedule.js?v=3" defer></script>
+<script src="js/map.js?v=3" defer></script>
 </head>
 <body>
 <div id="phone"><div id="app">
@@ -106,61 +106,104 @@
       <div class="trip-menu-item" onclick="goTo('settings');closeTripMenu()"><span class="ico" style="width:18px;height:18px"></span>設定</div>
     </div>
   </div>
-  <div class="td-card">
-    <!-- Members -->
-    <div class="td-card-members" onclick="goTo('members')">
-      <div class="td-card-mem-left">
-        <div class="td-card-mem-label">メンバー</div>
-        <div class="td-card-mem-count" id="td-mem-count">0人</div>
+  <!-- Swipeable panels container -->
+  <div class="td-swipe-wrap" id="td-swipe-wrap">
+    <div class="td-swipe-track" id="td-swipe-track" style="transform:translateX(-200%)">
+
+      <!-- Panel 0: アルバム -->
+      <div class="td-panel">
+        <div class="scroll">
+          <div class="td-panel-hdr">アルバム</div>
+          <div id="td-album-body" class="alb-body"><div class="loading">読み込み中...</div></div>
+        </div>
       </div>
-      <div id="td-members-row" class="td-card-mem-avatars"></div>
-      <span class="ico td-card-arrow" style="width:16px;height:16px"></span>
-    </div>
-    <!-- Date -->
-    <div class="td-card-date">
-      <span class="ico" style="width:18px;height:18px;color:var(--pri)"></span>
-      <span id="td-date-range">日程未設定</span>
-    </div>
-    <!-- 4 Action Buttons -->
-    <div class="td-card-actions">
-      <div class="td-action" onclick="goTo('schedule')">
-        <div class="td-action-icon"><span class="ico" style="width:24px;height:24px"></span></div>
-        <div class="td-action-label">予定</div>
+
+      <!-- Panel 1: マップ -->
+      <div class="td-panel">
+        <div class="td-panel-hdr">メンバーマップ</div>
+        <div id="td-map-container" style="flex:1;position:relative">
+          <div id="td-leaflet-map" style="width:100%;height:100%"></div>
+        </div>
       </div>
-      <div class="td-action" onclick="goTo('map')">
-        <div class="td-action-icon td-action-map"><span class="ico" style="width:24px;height:24px"></span></div>
-        <div class="td-action-label">マップ</div>
+
+      <!-- Panel 2: ホーム（メイン） -->
+      <div class="td-panel">
+        <div class="scroll">
+          <div class="td-card">
+            <div class="td-card-members" onclick="goTo('members')">
+              <div class="td-card-mem-left">
+                <div class="td-card-mem-label">メンバー</div>
+                <div class="td-card-mem-count" id="td-mem-count">0人</div>
+              </div>
+              <div id="td-members-row" class="td-card-mem-avatars"></div>
+              <span class="ico td-card-arrow" style="width:16px;height:16px"></span>
+            </div>
+            <div class="td-card-date">
+              <span class="ico" style="width:18px;height:18px;color:var(--pri)"></span>
+              <span id="td-date-range">日程未設定</span>
+            </div>
+            <div class="td-card-actions">
+              <div class="td-action" onclick="tripTabGo(3)">
+                <div class="td-action-icon"><span class="ico" style="width:24px;height:24px"></span></div>
+                <div class="td-action-label">予定</div>
+              </div>
+              <div class="td-action" onclick="tripTabGo(1)">
+                <div class="td-action-icon td-action-map"><span class="ico" style="width:24px;height:24px"></span></div>
+                <div class="td-action-label">マップ</div>
+              </div>
+              <div class="td-action" onclick="tripTabGo(0)">
+                <div class="td-action-icon td-action-album"><span class="ico" style="width:24px;height:24px"></span></div>
+                <div class="td-action-label">アルバム</div>
+              </div>
+              <div class="td-action" onclick="tripTabGo(4)">
+                <div class="td-action-icon td-action-chat"><span class="ico" style="width:24px;height:24px"></span></div>
+                <div class="td-action-label">チャット</div>
+              </div>
+            </div>
+          </div>
+          <div class="td-next-sched">
+            <div class="td-next-label">次の予定</div>
+            <div id="td-next-sched-body" class="td-next-body">
+              <div style="color:var(--text3);font-size:13px">予定はまだありません</div>
+            </div>
+          </div>
+          <div id="td-day-tabs" class="td-day-tabs"></div>
+          <div id="td-schedule-body" class="td-schedule">
+            <div class="loading">読み込み中...</div>
+          </div>
+        </div>
       </div>
-      <div class="td-action" onclick="goTo('album')">
-        <div class="td-action-icon td-action-album"><span class="ico" style="width:24px;height:24px"></span></div>
-        <div class="td-action-label">アルバム</div>
+
+      <!-- Panel 3: 予定 -->
+      <div class="td-panel">
+        <div class="scroll">
+          <div class="td-panel-hdr">タイムスケジュール</div>
+          <div id="td-sched-full" class="tl"><div class="loading">読み込み中...</div></div>
+          <div style="padding:0 16px 16px"><button class="btn btn-dashed" onclick="openSchedModal('new')">予定を追加</button></div>
+        </div>
       </div>
-      <div class="td-action" onclick="goTo('chat')">
-        <div class="td-action-icon td-action-chat"><span class="ico" style="width:24px;height:24px"></span></div>
-        <div class="td-action-label">チャット</div>
+
+      <!-- Panel 4: チャット -->
+      <div class="td-panel">
+        <div class="chat-bg" style="flex:1;display:flex;flex-direction:column">
+          <div id="td-chat-messages" class="chat-s"><div class="loading" style="color:rgba(255,255,255,.5)">読み込み中...</div></div>
+          <div class="chat-bar">
+            <button class="chat-plus" id="td-chat-plus"><span class="ico" style="width:18px;height:18px"></span></button>
+            <input id="td-chat-input" class="chat-inp" placeholder="メッセージを入力...">
+            <button class="chat-send-btn" onclick="sendTripChat()" id="td-chat-send"><span class="ico" style="width:18px;height:18px"></span></button>
+          </div>
+        </div>
       </div>
+
     </div>
   </div>
-  <!-- Next Schedule -->
-  <div class="td-next-sched">
-    <div class="td-next-label">次の予定</div>
-    <div id="td-next-sched-body" class="td-next-body">
-      <div style="color:var(--text3);font-size:13px">予定はまだありません</div>
-    </div>
-  </div>
-  <!-- Day Schedule below -->
-  <div class="scroll" style="flex:1">
-    <div id="td-day-tabs" class="td-day-tabs"></div>
-    <div id="td-schedule-body" class="td-schedule">
-      <div class="loading">読み込み中...</div>
-    </div>
-  </div>
-  <!-- Bottom nav -->
-  <div class="bnav td-bnav">
-    <div class="bnav-i" onclick="goTo('home')" id="td-bnav-home"></div>
-    <div class="bnav-i" onclick="goTo('schedule')" id="td-bnav-sched"></div>
-    <div class="bnav-i" onclick="goTo('map')" id="td-bnav-map"></div>
-    <div class="bnav-i" onclick="goTo('chat')" id="td-bnav-chat"></div>
+  <!-- Bottom nav: アルバム / マップ / ホーム / 予定 / チャット -->
+  <div class="bnav td-bnav" id="td-bnav">
+    <div class="bnav-i" onclick="tripTabGo(0)" id="td-bnav-album"></div>
+    <div class="bnav-i" onclick="tripTabGo(1)" id="td-bnav-map"></div>
+    <div class="bnav-i on" onclick="tripTabGo(2)" id="td-bnav-home"></div>
+    <div class="bnav-i" onclick="tripTabGo(3)" id="td-bnav-sched"></div>
+    <div class="bnav-i" onclick="tripTabGo(4)" id="td-bnav-chat"></div>
   </div>
 </div>
 
@@ -442,12 +485,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el) el.innerHTML = `<span class="ico" style="width:22px;height:22px">${I[icon]}</span><span>${label}</span>`;
   }
 
-  // Trip detail bottom nav
-  const tdBnavMap = { 'td-bnav-home': ['home', 'ホーム'], 'td-bnav-sched': ['calendar', '予定'], 'td-bnav-map': ['map', 'マップ'], 'td-bnav-chat': ['chat', 'チャット'] };
+  // Trip detail bottom nav (5 items: アルバム/マップ/ホーム/予定/チャット)
+  const tdBnavMap = { 'td-bnav-album': ['image', 'アルバム'], 'td-bnav-map': ['map', 'マップ'], 'td-bnav-home': ['home', 'ホーム'], 'td-bnav-sched': ['calendar', '予定'], 'td-bnav-chat': ['chat', 'チャット'] };
   for (const [id, [icon, label]] of Object.entries(tdBnavMap)) {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '<span class="ico" style="width:24px;height:24px">' + I[icon] + '</span><span>' + label + '</span>';
   }
+
+  // Trip detail embedded chat icons
+  const tdChatPlus = document.getElementById('td-chat-plus');
+  if (tdChatPlus) tdChatPlus.querySelector('.ico').innerHTML = I.plus || '';
+  const tdChatSend = document.getElementById('td-chat-send');
+  if (tdChatSend) tdChatSend.querySelector('.ico').innerHTML = I.send || '';
 
   // Trip detail action icons
   const tdActions = document.querySelectorAll('.td-action-icon .ico');

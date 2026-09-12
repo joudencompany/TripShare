@@ -186,6 +186,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .td-next-icon .ico{width:20px;height:20px;color:var(--pri)}
 .td-next-place{font-size:15px;font-weight:600;color:var(--text)}
 .td-next-time{font-size:13px;color:var(--text3)}
+/* Swipe panels */
+.td-swipe-wrap{flex:1;overflow:hidden;position:relative}
+.td-swipe-track{display:flex;width:500%;height:100%;transition:transform .3s ease}
+.td-panel{width:20%;height:100%;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden}
+.td-panel .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.td-panel .scroll::-webkit-scrollbar{display:none}
+.td-panel-hdr{padding:16px 20px 12px;font-size:18px;font-weight:700;color:var(--text)}
+
+/* Trip detail bottom nav 5 items */
+.td-bnav .bnav-i{flex:1}
 .td-bnav .bnav-i.on .ico{color:var(--pri)}
 .td-bnav .bnav-i.on span{color:var(--pri)}
 

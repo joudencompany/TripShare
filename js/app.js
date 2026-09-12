@@ -281,6 +281,15 @@ function startWatchingMessages(tripId) {
       return ta - tb;
     });
     if (window.renderMessages) window.renderMessages(msgs);
+    // 埋め込みチャットにも表示
+    if (window.renderMessages) {
+      const tdChat = document.getElementById('td-chat-messages');
+      if (tdChat) {
+        const origEl = document.getElementById('chat-messages');
+        if (origEl) tdChat.innerHTML = origEl.innerHTML;
+        tdChat.scrollTop = tdChat.scrollHeight;
+      }
+    }
   });
 }
 
@@ -360,6 +369,7 @@ function goTo(id) {
   updateNavArrows();
 
   // 各画面の初期化処理
+  if (id === 'trip-detail') { resetTripPanels(); }
   if (id === 'members') { if (window.renderMembers) window.renderMembers(); }
   if (id === 'settings') { if (window.renderSettings) window.renderSettings(); }
   if (id === 'chat') {
@@ -452,6 +462,107 @@ window.startWatchingSchedules = startWatchingSchedules;
 // window.renderPhotoGrid / window.renderAlbum / window.renderSchedule
 // window.renderTripDetailMembers / window.renderTripDetailSchedule
 // window.initMap
+
+// ============================================================
+//  トリップ内スワイプナビゲーション
+// ============================================================
+
+// パネル順: 0=アルバム, 1=マップ, 2=ホーム, 3=予定, 4=チャット
+let tripTabIndex = 2; // デフォルト: ホーム
+
+function tripTabGo(idx) {
+  if (idx < 0 || idx > 4) return;
+  tripTabIndex = idx;
+  const track = document.getElementById('td-swipe-track');
+  if (track) track.style.transform = `translateX(-${idx * 20}%)`;
+
+  // フッターのアクティブ状態更新
+  const bnav = document.getElementById('td-bnav');
+  if (bnav) {
+    bnav.querySelectorAll('.bnav-i').forEach((el, i) => {
+      el.classList.toggle('on', i === idx);
+    });
+  }
+
+  // パネル固有の初期化
+  if (idx === 1 && window.initTripMap) window.initTripMap();
+  if (idx === 4) {
+    // チャット: 埋め込みチャットのメッセージを最新にスクロール
+    setTimeout(() => {
+      const chatEl = document.getElementById('td-chat-messages');
+      if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;
+    }, 100);
+  }
+}
+window.tripTabGo = tripTabGo;
+
+// スワイプ検出
+(function initSwipe() {
+  let startX = 0, startY = 0, tracking = false;
+  const wrap = () => document.getElementById('td-swipe-wrap');
+
+  document.addEventListener('touchstart', (e) => {
+    if (!wrap() || !wrap().contains(e.target)) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx)) return; // 縦スクロールは無視
+    if (dx > 0) {
+      // 右スワイプ → 左のパネルへ
+      tripTabGo(tripTabIndex - 1);
+    } else {
+      // 左スワイプ → 右のパネルへ
+      tripTabGo(tripTabIndex + 1);
+    }
+  }, { passive: true });
+})();
+
+// トリップ詳細に入ったときパネルをホーム(2)にリセット
+function resetTripPanels() {
+  tripTabIndex = 2;
+  const track = document.getElementById('td-swipe-track');
+  if (track) track.style.transform = 'translateX(-200%)';
+  // フッターリセット
+  const bnav = document.getElementById('td-bnav');
+  if (bnav) {
+    bnav.querySelectorAll('.bnav-i').forEach((el, i) => {
+      el.classList.toggle('on', i === 2);
+    });
+  }
+}
+
+// 埋め込みチャットの送信
+window.sendTripChat = () => {
+  const inp = document.getElementById('td-chat-input');
+  const text = inp?.value?.trim();
+  if (!text) return;
+  const tripId = window._currentTripId;
+  if (tripId && window.sendMsgFB) {
+    window.sendMsgFB(tripId, text);
+  }
+  inp.value = '';
+  inp.focus();
+};
+
+// 埋め込みチャットのEnter送信
+document.addEventListener('DOMContentLoaded', () => {
+  const inp = document.getElementById('td-chat-input');
+  if (inp) {
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        window.sendTripChat();
+      }
+    });
+  }
+});
 
 // ユーティリティをグローバル公開（他ファイルのテンプレートから参照できるように）
 window.esc = esc;
