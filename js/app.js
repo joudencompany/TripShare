@@ -35,6 +35,7 @@ window._doc = doc;
 window._setDoc = setDoc;
 window._getDoc = getDoc;
 window._getDocs = getDocs;
+window._updateDoc = updateDoc;
 
 // ===== unsub変数群 =====
 let unsubTrips = null;
@@ -57,6 +58,7 @@ let navLock = false; // back/forward時のpush防止
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     window._fbUser = user;
+    localStorage.setItem('tripshare_logged_in', 'true');
     console.log("Firebase: ログイン成功 -", user.displayName);
     try {
       const userRef = doc(db, "users", user.uid);
@@ -97,18 +99,34 @@ onAuthStateChanged(auth, async (user) => {
 
     const splash = document.getElementById("screen-splash");
     if (splash && splash.classList.contains("active")) {
-      const st = document.getElementById("splash-status");
-      if (st) st.textContent = user.displayName + " でログイン中...";
-      setTimeout(() => {
-        goTo("home");
-        startWatchingTrips(user.uid);
-        startWatchingPublicPosts();
-      }, 1200);
+      // ログイン済み → splashをスキップして即座にhomeへ遷移
+      goTo("home");
+      startWatchingTrips(user.uid);
+      startWatchingPublicPosts();
     }
   } else {
     window._fbUser = null;
     if (unsubTrips) { unsubTrips(); unsubTrips = null; }
     if (unsubPublicPosts) { unsubPublicPosts(); unsubPublicPosts = null; }
+
+    // 以前ログインしていた場合 → splash画面で「ログイン中...」表示
+    if (localStorage.getItem('tripshare_logged_in')) {
+      const st = document.getElementById("splash-status");
+      if (st) st.textContent = "ログイン中...";
+      const loginBtns = document.querySelector(".splash-btns");
+      if (loginBtns) loginBtns.style.display = "none";
+      // セッション切れの場合: ポップアップでログイン試行
+      try {
+        await signInWithPopup(auth, new GoogleAuthProvider());
+        // 成功すればonAuthStateChangedが再発火してhomeへ遷移する
+      } catch(e) {
+        console.warn("自動再ログイン失敗:", e.message);
+        localStorage.removeItem('tripshare_logged_in');
+        // ボタンを再表示して通常のsplashに戻す
+        if (st) st.textContent = "";
+        if (loginBtns) loginBtns.style.display = "";
+      }
+    }
   }
 });
 
@@ -130,6 +148,7 @@ window.loginGoogle = async () => {
 window.fbLogout = async () => {
   if (unsubTrips) { unsubTrips(); unsubTrips = null; }
   if (unsubPublicPosts) { unsubPublicPosts(); unsubPublicPosts = null; }
+  localStorage.removeItem('tripshare_logged_in');
   await signOut(auth);
   goTo("splash");
 };
@@ -222,6 +241,22 @@ window.openTrip = (tripId) => {
   if (tdName) tdName.textContent = trip.name;
   if (window.renderTripDetailMembers) window.renderTripDetailMembers(trip.members || []);
 
+  // Update cover
+  const cover = document.getElementById('td-cover');
+  if (cover) {
+    cover.className = 'td-cover ' + (trip.coverColor || 'cov-k');
+    if (trip.coverUrl) {
+      cover.style.backgroundImage = 'url(' + trip.coverUrl + ')';
+      cover.style.backgroundSize = 'cover';
+      cover.style.backgroundPosition = 'center';
+    } else {
+      cover.style.backgroundImage = '';
+    }
+  }
+  // Update date range
+  const dateEl = document.getElementById('td-date-range');
+  if (dateEl) dateEl.textContent = formatDateRange(trip.startDate, trip.endDate);
+
   // 各サブデータの監視を開始
   startWatchingMessages(tripId);
   startWatchingPhotos(tripId);
@@ -271,6 +306,7 @@ function startWatchingAllSchedules(tripId, startDate, endDate) {
     allScheds.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
     window._allSchedules = allScheds;
     if (window.renderTripDetailSchedule) window.renderTripDetailSchedule(allScheds, startDate, endDate);
+    if (window.renderNextSchedule) window.renderNextSchedule(allScheds);
   });
 }
 

@@ -91,44 +91,76 @@
 
 <!-- TRIP DETAIL -->
 <div id="screen-trip-detail" class="screen">
-  <div class="td-hdr">
-    <div class="td-hdr-top">
-      <div class="td-hdr-back" onclick="goTo('home')"><span class="ico" id="td-back-ico"></span></div>
-      <div id="td-trip-name" class="td-trip-name">旅行名</div>
-      <button class="td-hdr-more" onclick="goTo('settings')" id="td-more-btn"></button>
+  <div class="td-cover-wrap">
+    <div id="td-cover" class="td-cover cov-k">
+      <div class="td-cover-overlay"></div>
+      <button class="td-back-btn" onclick="goTo('home')"><span class="ico" id="td-back-ico"></span></button>
+      <button class="td-more-btn" onclick="toggleTripMenu()" id="td-more-btn2"></button>
+      <div class="td-cover-title" id="td-trip-name">旅行名</div>
+    </div>
+    <!-- Trip menu dropdown -->
+    <div id="trip-menu" class="trip-menu">
+      <div class="trip-menu-item" onclick="openCoverChange();closeTripMenu()"><span class="ico" style="width:18px;height:18px"></span>カバー写真を変更</div>
+      <div class="trip-menu-item" onclick="openGroupIconChange();closeTripMenu()"><span class="ico" style="width:18px;height:18px"></span>グループアイコンを変更</div>
+      <div class="trip-menu-item" onclick="openGroupNameEdit();closeTripMenu()"><span class="ico" style="width:18px;height:18px"></span>グループ名を変更</div>
+      <div class="trip-menu-item" onclick="goTo('settings');closeTripMenu()"><span class="ico" style="width:18px;height:18px"></span>設定</div>
     </div>
   </div>
-  <div class="scroll">
-    <!-- Members (clickable to go to member list) -->
-    <div class="td-members-sec" onclick="goTo('members')" style="cursor:pointer">
-      <div class="td-members-label">メンバー</div>
-      <div id="td-members-row" class="td-members-scroll"></div>
+  <div class="td-card">
+    <!-- Members -->
+    <div class="td-card-members" onclick="goTo('members')">
+      <div class="td-card-mem-left">
+        <div class="td-card-mem-label">メンバー</div>
+        <div class="td-card-mem-count" id="td-mem-count">0人</div>
+      </div>
+      <div id="td-members-row" class="td-card-mem-avatars"></div>
+      <span class="ico td-card-arrow" style="width:16px;height:16px"></span>
     </div>
-    <!-- Add button -> Invite -->
-    <div class="td-add-group">
-      <button class="td-add-btn" onclick="event.stopPropagation();goTo('members')"><span class="ico" style="width:14px;height:14px" id="td-add-ico"></span>メンバー招待</button>
+    <!-- Date -->
+    <div class="td-card-date">
+      <span class="ico" style="width:18px;height:18px;color:var(--pri)"></span>
+      <span id="td-date-range">日程未設定</span>
     </div>
-    <!-- GPS + Map -->
-    <div class="td-gps">
-      <div class="td-gps-l"><span class="ico" id="td-gps-ico"></span>GPS位置共有</div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button class="td-map-btn" onclick="goTo('map')" style="background:var(--pri);color:#fff;border:none;border-radius:14px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">マップ</button>
-        <div class="toggle-sm"></div>
+    <!-- 4 Action Buttons -->
+    <div class="td-card-actions">
+      <div class="td-action" onclick="goTo('schedule')">
+        <div class="td-action-icon"><span class="ico" style="width:24px;height:24px"></span></div>
+        <div class="td-action-label">予定</div>
+      </div>
+      <div class="td-action" onclick="goTo('map')">
+        <div class="td-action-icon td-action-map"><span class="ico" style="width:24px;height:24px"></span></div>
+        <div class="td-action-label">マップ</div>
+      </div>
+      <div class="td-action" onclick="goTo('album')">
+        <div class="td-action-icon td-action-album"><span class="ico" style="width:24px;height:24px"></span></div>
+        <div class="td-action-label">アルバム</div>
+      </div>
+      <div class="td-action" onclick="goTo('chat')">
+        <div class="td-action-icon td-action-chat"><span class="ico" style="width:24px;height:24px"></span></div>
+        <div class="td-action-label">チャット</div>
       </div>
     </div>
-    <!-- Day tabs + Schedule -->
+  </div>
+  <!-- Next Schedule -->
+  <div class="td-next-sched">
+    <div class="td-next-label">次の予定</div>
+    <div id="td-next-sched-body" class="td-next-body">
+      <div style="color:var(--text3);font-size:13px">予定はまだありません</div>
+    </div>
+  </div>
+  <!-- Day Schedule below -->
+  <div class="scroll" style="flex:1">
     <div id="td-day-tabs" class="td-day-tabs"></div>
     <div id="td-schedule-body" class="td-schedule">
       <div class="loading">読み込み中...</div>
     </div>
   </div>
-  <!-- Trip inner nav -->
-  <div class="tinav">
-    <div class="ti" onclick="goTo('chat')" id="ti-chat"></div>
-    <div class="ti" onclick="goTo('camera-roll')" id="ti-photo"></div>
-    <div class="ti" onclick="goTo('camera')" id="ti-cam"></div>
-    <div class="ti" onclick="goTo('album')" id="ti-album"></div>
-    <div class="ti on" id="ti-sched"></div>
+  <!-- Bottom nav -->
+  <div class="bnav td-bnav">
+    <div class="bnav-i" onclick="goTo('home')" id="td-bnav-home"></div>
+    <div class="bnav-i" onclick="goTo('schedule')" id="td-bnav-sched"></div>
+    <div class="bnav-i" onclick="goTo('map')" id="td-bnav-map"></div>
+    <div class="bnav-i" onclick="goTo('chat')" id="td-bnav-chat"></div>
   </div>
 </div>
 
@@ -325,6 +357,35 @@
   </div>
 </div>
 
+<!-- MODAL: Cover Change -->
+<div id="modal-cover-change" class="modal-ov" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="modal-sh">
+    <div class="modal-bar"></div>
+    <div class="modal-t">カバー写真を変更</div>
+    <div class="cover-change-grid">
+      <div class="cover-change-opt cov-k" onclick="changeTripCover('cov-k')"></div>
+      <div class="cover-change-opt cov-h" onclick="changeTripCover('cov-h')"></div>
+      <div class="cover-change-opt cov-m" onclick="changeTripCover('cov-m')"></div>
+      <div class="cover-change-opt" style="background:linear-gradient(135deg,#667eea,#764ba2)" onclick="changeTripCover('p1')"></div>
+      <div class="cover-change-opt" style="background:linear-gradient(135deg,#f093fb,#f5576c)" onclick="changeTripCover('p4')"></div>
+      <div class="cover-change-opt" style="background:linear-gradient(135deg,#4facfe,#00f2fe)" onclick="changeTripCover('p3')"></div>
+    </div>
+    <label class="form-l" style="margin-top:16px">または画像URLを入力</label>
+    <input id="inp-cover-url" class="form-i" placeholder="https://example.com/photo.jpg">
+    <button class="btn btn-pri" onclick="applyCoverUrl()">適用</button>
+  </div>
+</div>
+
+<!-- MODAL: Group Name Edit -->
+<div id="modal-group-name" class="modal-ov" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="modal-sh">
+    <div class="modal-bar"></div>
+    <div class="modal-t">グループ名を変更</div>
+    <input id="inp-group-name" class="form-i" placeholder="新しいグループ名">
+    <button class="btn btn-pri" onclick="changeGroupName()">変更する</button>
+  </div>
+</div>
+
 </div></div>
 
 <script>
@@ -332,7 +393,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const iconMap = {
     'btn-bell': 'bell', 'btn-user': 'user',
-    'td-back-ico': 'back', 'td-more-btn': 'settings', 'td-add-ico': 'plus', 'td-gps-ico': 'gps',
+    'td-back-ico': 'back', 'td-more-btn': 'settings', 'td-more-btn2': 'more', 'td-add-ico': 'plus', 'td-gps-ico': 'gps',
     'sched-back-btn': 'back', 'sched-prev-btn': 'left', 'sched-next-btn': 'right',
     'cr-back-btn': 'back', 'cr-cam-btn': 'camera',
     'cam-flip-btn': 'flip',
@@ -380,6 +441,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = `<span class="ico" style="width:22px;height:22px">${I[icon]}</span><span>${label}</span>`;
   }
+
+  // Trip detail bottom nav
+  const tdBnavMap = { 'td-bnav-home': ['home', 'ホーム'], 'td-bnav-sched': ['calendar', '予定'], 'td-bnav-map': ['map', 'マップ'], 'td-bnav-chat': ['chat', 'チャット'] };
+  for (const [id, [icon, label]] of Object.entries(tdBnavMap)) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<span class="ico" style="width:24px;height:24px">' + I[icon] + '</span><span>' + label + '</span>';
+  }
+
+  // Trip detail action icons
+  const tdActions = document.querySelectorAll('.td-action-icon .ico');
+  const tdActionIcons = ['calendar', 'map', 'image', 'chat'];
+  tdActions.forEach((el, i) => { if (tdActionIcons[i]) el.innerHTML = I[tdActionIcons[i]] || ''; });
+
+  // Trip detail card date icon
+  const tdDateIcon = document.querySelector('.td-card-date .ico');
+  if (tdDateIcon) tdDateIcon.innerHTML = I.calendar || '';
+
+  // Trip detail card arrow
+  const tdArrow = document.querySelector('.td-card-arrow');
+  if (tdArrow) tdArrow.innerHTML = I.right || '';
+
+  // Trip menu icons
+  const menuIcons = ['image', 'user', 'chat', 'settings'];
+  document.querySelectorAll('.trip-menu-item .ico').forEach((el, i) => {
+    if (menuIcons[i]) el.innerHTML = I[menuIcons[i]] || '';
+  });
 
   // data-icon
   document.querySelectorAll('[data-icon]').forEach(el => {

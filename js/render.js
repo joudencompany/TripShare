@@ -68,13 +68,12 @@ window.renderWorldTab = (posts) => {
 // --- トリップ詳細: メンバー横並び ---
 window.renderTripDetailMembers = (members) => {
   const el = document.getElementById("td-members-row");
+  const countEl = document.getElementById("td-mem-count");
+  if (countEl) countEl.textContent = members.length + '人';
   if (!el) return;
-  el.innerHTML = members.map(m => `
-    <div class="td-mem">
-      <div class="av td-mem-av ${m.color || 'c4'}">${m.avatar ? `<img src="${m.avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : (m.initial || '?')}</div>
-      <div class="td-mem-nm">${esc((m.name || '').split(' ')[0])}</div>
-    </div>
-  `).join('');
+  el.innerHTML = members.map(m =>
+    `<div class="av ${m.color || 'c4'}">${m.avatar ? '<img src="' + m.avatar + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover">' : (m.initial || '?')}</div>`
+  ).join('');
 };
 
 // --- 写真グリッド（カメラロール） ---
@@ -272,4 +271,91 @@ window.renderSettings = () => {
       </div>
     </div>
   `;
+};
+
+// --- Trip Menu ---
+window.toggleTripMenu = () => {
+  const menu = document.getElementById('trip-menu');
+  if (menu) menu.classList.toggle('show');
+};
+window.closeTripMenu = () => {
+  const menu = document.getElementById('trip-menu');
+  if (menu) menu.classList.remove('show');
+};
+// Close menu on outside click
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('trip-menu');
+  const btn = document.getElementById('td-more-btn2');
+  if (menu && !menu.contains(e.target) && e.target !== btn && !btn?.contains(e.target)) {
+    menu.classList.remove('show');
+  }
+});
+
+// --- Cover Change ---
+window.openCoverChange = () => {
+  document.getElementById('modal-cover-change')?.classList.add('show');
+};
+window.changeTripCover = async (colorClass) => {
+  if (!window._currentTripId) return;
+  try {
+    await window._updateDoc(window._doc(window._db, "trips", window._currentTripId), { coverColor: colorClass, coverUrl: '' });
+    const cover = document.getElementById('td-cover');
+    if (cover) { cover.className = 'td-cover ' + colorClass; cover.style.backgroundImage = ''; }
+    if (window._currentTrip) window._currentTrip.coverColor = colorClass;
+    document.getElementById('modal-cover-change')?.classList.remove('show');
+  } catch(e) { alert('変更に失敗: ' + e.message); }
+};
+window.applyCoverUrl = async () => {
+  const url = document.getElementById('inp-cover-url')?.value?.trim();
+  if (!url || !window._currentTripId) return;
+  try {
+    await window._updateDoc(window._doc(window._db, "trips", window._currentTripId), { coverUrl: url });
+    const cover = document.getElementById('td-cover');
+    if (cover) { cover.style.backgroundImage = 'url(' + url + ')'; cover.style.backgroundSize = 'cover'; cover.style.backgroundPosition = 'center'; }
+    document.getElementById('modal-cover-change')?.classList.remove('show');
+  } catch(e) { alert('変更に失敗: ' + e.message); }
+};
+
+// --- Group Name Edit ---
+window.openGroupNameEdit = () => {
+  const inp = document.getElementById('inp-group-name');
+  if (inp && window._currentTrip) inp.value = window._currentTrip.name;
+  document.getElementById('modal-group-name')?.classList.add('show');
+};
+window.changeGroupName = async () => {
+  const name = document.getElementById('inp-group-name')?.value?.trim();
+  if (!name || !window._currentTripId) return;
+  try {
+    await window._updateDoc(window._doc(window._db, "trips", window._currentTripId), { name });
+    document.getElementById('td-trip-name').textContent = name;
+    if (window._currentTrip) window._currentTrip.name = name;
+    document.getElementById('modal-group-name')?.classList.remove('show');
+  } catch(e) { alert('変更に失敗: ' + e.message); }
+};
+
+// --- Group Icon Change (placeholder) ---
+window.openGroupIconChange = () => {
+  alert('グループアイコン変更は近日実装予定です');
+};
+
+// --- Next Schedule render ---
+window.renderNextSchedule = (allScheds) => {
+  const el = document.getElementById('td-next-sched-body');
+  if (!el) return;
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  const nowTime = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+
+  // Find next upcoming schedule
+  const upcoming = allScheds
+    .filter(s => !s.parentId && ((s.date > today) || (s.date === today && (s.time || '99:99') > nowTime)))
+    .sort((a,b) => (a.date + (a.time||'')).localeCompare(b.date + (b.time||'')));
+
+  if (upcoming.length === 0) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:4px">予定はまだありません</div>';
+    return;
+  }
+  const next = upcoming[0];
+  const iconSvg = window.I[next.icon] || window.I.pin;
+  el.innerHTML = '<div class="td-next-icon"><span class="ico">' + iconSvg + '</span></div><div><div class="td-next-place">' + esc(next.title) + '</div><div class="td-next-time">' + (next.time || '') + '</div></div>';
 };

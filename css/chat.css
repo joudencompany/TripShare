@@ -1,49 +1,62 @@
-/* ===== LINE-style Chat ===== */
+/* ===== LINE-style Chat (Enhanced) ===== */
 .chat-bg{background:#7494A5;flex:1;display:flex;flex-direction:column}
-.chat-s{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px}
+.chat-s{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px 8px}
 .chat-s::-webkit-scrollbar{display:none}
 
 /* 日付区切り */
 .chat-dt{text-align:center;margin:16px 0 12px;font-size:12px;color:#fff;font-weight:500}
-.chat-dt span{background:rgba(0,0,0,.25);padding:4px 12px;border-radius:12px;font-size:11px}
+.chat-dt span{background:rgba(0,0,0,.25);padding:4px 14px;border-radius:14px;font-size:11px;font-weight:600}
 
 /* メッセージ共通 */
-.msg{display:flex;align-items:flex-end;gap:6px;margin-bottom:4px;max-width:80%}
+.msg{display:flex;align-items:flex-end;gap:6px;margin-bottom:6px;max-width:82%}
 .msg.me{flex-direction:row-reverse;margin-left:auto}
 .msg:not(.me){margin-right:auto}
+.msg.msg-cont{margin-bottom:3px}
 
 /* 送信者名（相手のみ） */
-.msg-sender{font-size:11px;color:rgba(255,255,255,.7);margin-bottom:2px;margin-left:4px}
+.msg-sender{font-size:11px;color:rgba(255,255,255,.75);margin-bottom:3px;margin-left:4px;font-weight:500}
 
 /* アバター（相手のみ） */
 .msg-av{width:36px;height:36px;font-size:13px;flex-shrink:0;align-self:flex-start;margin-top:2px}
+.msg-av-spacer{width:36px;flex-shrink:0}
 .msg.me .msg-av{display:none}
 
 /* 吹き出し */
-.msg-bubble{position:relative;padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.5;word-break:break-word;max-width:100%}
+.msg-bubble{position:relative;padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.55;word-break:break-word;max-width:100%}
+.msg-row{display:flex;align-items:flex-end;gap:4px}
+.msg-w{display:flex;flex-direction:column;gap:1px}
 
-/* 自分: 緑 */
+/* 自分: LINE緑 */
 .msg.me .msg-bubble{background:#06C755;color:#fff;border-bottom-right-radius:4px}
 .msg.me .msg-bubble::after{content:'';position:absolute;bottom:0;right:-6px;width:12px;height:12px;background:#06C755;clip-path:polygon(0 0, 0 100%, 100% 0)}
 
 /* 相手: 白 */
-.msg:not(.me) .msg-bubble{background:#fff;color:#1a1a2e;border-bottom-left-radius:4px}
-.msg:not(.me) .msg-bubble::after{content:'';position:absolute;bottom:0;left:-6px;width:12px;height:12px;background:#fff;clip-path:polygon(100% 0, 0 0, 100% 100%)}
+.msg:not(.me) .msg-bubble{background:#fff;color:#1a1a2e;border-bottom-left-radius:4px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.msg:not(.me):not(.msg-cont) .msg-bubble::after{content:'';position:absolute;bottom:0;left:-6px;width:12px;height:12px;background:#fff;clip-path:polygon(100% 0, 0 0, 100% 100%)}
 
 /* 時刻 */
-.msg-time{font-size:10px;color:rgba(255,255,255,.55);white-space:nowrap;align-self:flex-end;margin-bottom:2px}
-.msg.me .msg-time{margin-right:4px}
-.msg:not(.me) .msg-time{margin-left:4px}
+.msg-time{font-size:10px;color:rgba(255,255,255,.55);white-space:nowrap;align-self:flex-end;margin-bottom:2px;flex-shrink:0}
+.msg.me .msg-time{margin-right:2px}
+.msg:not(.me) .msg-time{margin-left:2px}
 
-/* 既読 */
-.msg-read{font-size:10px;color:rgba(255,255,255,.55);text-align:right}
+/* 既読 + 時刻（自分のメッセージ） */
+.msg-meta-me{display:flex;flex-direction:column;align-items:flex-end;justify-content:flex-end;gap:0;margin-right:2px}
+.msg-read{font-size:10px;color:rgba(255,255,255,.55);line-height:1}
 
-/* 入力バー */
-.chat-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border-top:1px solid var(--border)}
-.chat-plus{width:36px;height:36px;border-radius:50%;background:none;border:2px solid var(--text3);color:var(--text3);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+/* 画像メッセージ */
+.msg-img{max-width:200px;border-radius:14px;overflow:hidden}
+.msg-img img{width:100%;display:block;border-radius:14px}
+
+/* 空チャット */
+.chat-empty{padding:60px 20px;text-align:center;color:rgba(255,255,255,.45);font-size:14px;line-height:1.8}
+
+/* 入力バー - LINE風 */
+.chat-bar{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#fff;border-top:none}
+.chat-plus{width:36px;height:36px;border-radius:50%;background:none;border:2px solid #bbb;color:#bbb;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s}
+.chat-plus:active{border-color:var(--pri);color:var(--pri)}
 .chat-plus .ico{width:18px;height:18px}
-.chat-inp{flex:1;border:1px solid #ddd;border-radius:20px;padding:8px 16px;font-size:14px;outline:none;font-family:inherit;background:#f5f5f5}
-.chat-inp:focus{border-color:var(--pri);background:#fff}
-.chat-send-btn{width:36px;height:36px;border-radius:50%;background:#06C755;border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.chat-inp{flex:1;border:1px solid #e0e0e0;border-radius:20px;padding:9px 16px;font-size:14px;outline:none;font-family:inherit;background:#f5f5f5;transition:all .2s;resize:none}
+.chat-inp:focus{border-color:#06C755;background:#fff;box-shadow:0 0 0 2px rgba(6,199,85,.1)}
+.chat-send-btn{width:36px;height:36px;border-radius:50%;background:#06C755;border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform .1s}
+.chat-send-btn:active{transform:scale(.88)}
 .chat-send-btn .ico{width:18px;height:18px}
-.chat-send-btn:active{transform:scale(.92)}
