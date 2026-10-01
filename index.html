@@ -15,40 +15,61 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
 <!-- App CSS (cache bust) -->
-<link rel="stylesheet" href="css/style.css?v=4">
-<link rel="stylesheet" href="css/chat.css?v=4">
-<link rel="stylesheet" href="css/camera.css?v=4">
-<link rel="stylesheet" href="css/schedule.css?v=4">
+<link rel="stylesheet" href="css/style.css?v=19">
+<link rel="stylesheet" href="css/chat.css?v=19">
+<link rel="stylesheet" href="css/camera.css?v=19">
+<link rel="stylesheet" href="css/schedule.css?v=19">
 
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <!-- Icons (must load first) -->
-<script src="js/icons.js?v=4"></script>
+<script src="js/icons.js?v=19"></script>
 
 <!-- Firebase Module: Auth + Firestore + Navigation -->
-<script type="module" src="js/app.js?v=4"></script>
+<script type="module" src="js/app.js?v=19"></script>
 
 <!-- Feature Scripts (non-module, uses window globals) -->
-<script src="js/render.js?v=4" defer></script>
-<script src="js/chat.js?v=4" defer></script>
-<script src="js/camera.js?v=4" defer></script>
-<script src="js/schedule.js?v=4" defer></script>
-<script src="js/map.js?v=4" defer></script>
+<script src="js/render.js?v=19" defer></script>
+<script src="js/chat.js?v=19" defer></script>
+<script src="js/camera.js?v=19" defer></script>
+<script src="js/schedule.js?v=19" defer></script>
+<script src="js/map.js?v=19" defer></script>
 </head>
 <body>
 <div id="phone"><div id="app">
 
 <!-- SPLASH -->
 <div id="screen-splash" class="screen active">
-  <div class="sb w"><span id="sb-time">9:41</span><span style="font-size:13px">5G</span></div>
   <div class="splash-body">
     <div class="splash-top"></div>
-    <div class="splash-btns">
+    <div class="splash-btns" id="splash-btns" style="display:none">
       <button class="btn btn-pri" onclick="loginGoogle()">Googleでログイン</button>
-      <button class="btn btn-out">ゲストとして始める</button>
-      <div class="splash-status" id="splash-status"></div>
+      <button class="btn btn-out" onclick="showGuestForm()">ゲストIDで始める</button>
+      <button class="btn btn-out" onclick="showGuestForm();switchGuestTab('register',document.querySelectorAll('.guest-tab')[1])">新規登録（ゲストID）</button>
+      <!-- ゲストIDフォーム（インライン表示） -->
+      <div id="guest-form" class="guest-form" style="display:none">
+        <div class="guest-tabs">
+          <div class="guest-tab on" onclick="switchGuestTab('login',this)">ログイン</div>
+          <div class="guest-tab" onclick="switchGuestTab('register',this)">新規登録</div>
+        </div>
+        <!-- ログインタブ -->
+        <div id="guest-tab-login" class="guest-tab-content">
+          <input id="guest-login-id" class="form-i" placeholder="ゲストID（英数字）" autocomplete="username">
+          <input id="guest-login-pw" class="form-i" type="password" placeholder="パスワード" autocomplete="current-password">
+          <button class="btn btn-pri" onclick="loginGuest()">ログイン</button>
+        </div>
+        <!-- 新規登録タブ -->
+        <div id="guest-tab-register" class="guest-tab-content" style="display:none">
+          <input id="guest-reg-id" class="form-i" placeholder="ゲストID（英数字）" autocomplete="username">
+          <input id="guest-reg-pw" class="form-i" type="password" placeholder="パスワード（6文字以上）" autocomplete="new-password">
+          <input id="guest-reg-nick" class="form-i" placeholder="ニックネーム（表示名）">
+          <button class="btn btn-pri" onclick="registerGuest()">登録する</button>
+        </div>
+        <div class="guest-back-link" onclick="hideGuestForm()">戻る</div>
+      </div>
     </div>
+    <div class="splash-login-status" id="splash-login-status" style="display:none"></div>
   </div>
 </div>
 
@@ -97,143 +118,93 @@
 
 <!-- TRIP DETAIL -->
 <div id="screen-trip-detail" class="screen">
-  <div class="td-cover-wrap">
+  <!-- Trip menu dropdown (floating) -->
+  <div id="trip-menu" class="trip-menu">
+    <div class="trip-menu-item" onclick="openCoverChange();closeTripMenu()"><span class="ico" style="width:18px;height:18px"></span>カバー写真を変更</div>
+    <div class="trip-menu-item" onclick="openGroupIconChange();closeTripMenu()"><span class="ico" style="width:18px;height:18px"></span>グループアイコンを変更</div>
+    <div class="trip-menu-item" onclick="openGroupNameEdit();closeTripMenu()"><span class="ico" style="width:18px;height:18px"></span>グループ名を変更</div>
+    <div class="trip-menu-item" onclick="goTo('settings');closeTripMenu()"><span class="ico" style="width:18px;height:18px"></span>設定</div>
+  </div>
+  <!-- Main scrollable content -->
+  <div class="td-main-scroll" id="td-main-scroll">
+    <!-- Cover photo -->
     <div id="td-cover" class="td-cover cov-k">
       <div class="td-cover-overlay"></div>
       <button class="td-back-btn" onclick="goTo('home')"><span class="ico" id="td-back-ico"></span></button>
       <button class="td-more-btn" onclick="toggleTripMenu()" id="td-more-btn2"></button>
       <div class="td-cover-title" id="td-trip-name">旅行名</div>
     </div>
-    <!-- Trip menu dropdown -->
-    <div id="trip-menu" class="trip-menu">
-      <div class="trip-menu-item" onclick="openCoverChange();closeTripMenu()"><span class="ico" style="width:18px;height:18px"></span>カバー写真を変更</div>
-      <div class="trip-menu-item" onclick="openGroupIconChange();closeTripMenu()"><span class="ico" style="width:18px;height:18px"></span>グループアイコンを変更</div>
-      <div class="trip-menu-item" onclick="openGroupNameEdit();closeTripMenu()"><span class="ico" style="width:18px;height:18px"></span>グループ名を変更</div>
-      <div class="trip-menu-item" onclick="goTo('settings');closeTripMenu()"><span class="ico" style="width:18px;height:18px"></span>設定</div>
+    <!-- White card (overlaps cover) -->
+    <div class="td-card">
+      <div class="td-card-members" onclick="goTo('members')">
+        <div class="td-card-mem-left">
+          <div class="td-card-mem-label">メンバー</div>
+          <div class="td-card-mem-count" id="td-mem-count">0人</div>
+        </div>
+        <div id="td-members-row" class="td-card-mem-avatars"></div>
+        <span class="ico td-card-arrow" style="width:16px;height:16px"></span>
+      </div>
+      <div class="td-card-date">
+        <span class="ico" style="width:18px;height:18px;color:var(--pri)"></span>
+        <span id="td-date-range">日程未設定</span>
+      </div>
+      <div class="td-card-actions">
+        <div class="td-action" onclick="goTo('schedule')">
+          <div class="td-action-icon"><span class="ico" style="width:24px;height:24px"></span></div>
+          <div class="td-action-label">予定</div>
+        </div>
+        <div class="td-action" onclick="goTo('members')">
+          <div class="td-action-icon td-action-map"><span class="ico" style="width:24px;height:24px"></span></div>
+          <div class="td-action-label">マップ</div>
+        </div>
+        <div class="td-action" onclick="goTo('album')">
+          <div class="td-action-icon td-action-album"><span class="ico" style="width:24px;height:24px"></span></div>
+          <div class="td-action-label">アルバム</div>
+        </div>
+        <div class="td-action" onclick="goTo('chat')">
+          <div class="td-action-icon td-action-chat"><span class="ico" style="width:24px;height:24px"></span></div>
+          <div class="td-action-label">チャット</div>
+        </div>
+      </div>
     </div>
-  </div>
-  <!-- Swipeable panels container -->
-  <div class="td-swipe-wrap" id="td-swipe-wrap">
-    <div class="td-swipe-track" id="td-swipe-track" style="transform:translateX(-200%)">
-
-      <!-- Panel 0: アルバム -->
-      <div class="td-panel">
-        <div class="scroll">
-          <div class="td-panel-hdr">アルバム</div>
-          <div id="td-album-body" class="alb-body"><div class="loading">読み込み中...</div></div>
-        </div>
+    <!-- 次の予定 -->
+    <div class="td-next-sched">
+      <div class="td-next-label">次の予定</div>
+      <div id="td-next-sched-body" class="td-next-body">
+        <div style="color:var(--text3);font-size:13px">予定はまだありません</div>
       </div>
-
-      <!-- Panel 1: マップ -->
-      <div class="td-panel">
-        <div class="td-panel-hdr">メンバーマップ</div>
-        <div id="td-map-container" style="flex:1;position:relative">
-          <div id="td-leaflet-map" style="width:100%;height:100%"></div>
-        </div>
-      </div>
-
-      <!-- Panel 2: ホーム（メイン） -->
-      <div class="td-panel">
-        <div class="scroll">
-          <div class="td-card">
-            <div class="td-card-members" onclick="goTo('members')">
-              <div class="td-card-mem-left">
-                <div class="td-card-mem-label">メンバー</div>
-                <div class="td-card-mem-count" id="td-mem-count">0人</div>
-              </div>
-              <div id="td-members-row" class="td-card-mem-avatars"></div>
-              <span class="ico td-card-arrow" style="width:16px;height:16px"></span>
-            </div>
-            <div class="td-card-date">
-              <span class="ico" style="width:18px;height:18px;color:var(--pri)"></span>
-              <span id="td-date-range">日程未設定</span>
-            </div>
-            <div class="td-card-actions">
-              <div class="td-action" onclick="tripTabGo(3)">
-                <div class="td-action-icon"><span class="ico" style="width:24px;height:24px"></span></div>
-                <div class="td-action-label">予定</div>
-              </div>
-              <div class="td-action" onclick="tripTabGo(1)">
-                <div class="td-action-icon td-action-map"><span class="ico" style="width:24px;height:24px"></span></div>
-                <div class="td-action-label">マップ</div>
-              </div>
-              <div class="td-action" onclick="tripTabGo(0)">
-                <div class="td-action-icon td-action-album"><span class="ico" style="width:24px;height:24px"></span></div>
-                <div class="td-action-label">アルバム</div>
-              </div>
-              <div class="td-action" onclick="tripTabGo(4)">
-                <div class="td-action-icon td-action-chat"><span class="ico" style="width:24px;height:24px"></span></div>
-                <div class="td-action-label">チャット</div>
-              </div>
-            </div>
-          </div>
-          <div class="td-next-sched">
-            <div class="td-next-label">次の予定</div>
-            <div id="td-next-sched-body" class="td-next-body">
-              <div style="color:var(--text3);font-size:13px">予定はまだありません</div>
-            </div>
-          </div>
-          <div id="td-day-tabs" class="td-day-tabs"></div>
-          <div id="td-schedule-body" class="td-schedule">
-            <div class="loading">読み込み中...</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Panel 3: 予定 -->
-      <div class="td-panel">
-        <div class="scroll">
-          <div class="td-panel-hdr">タイムスケジュール</div>
-          <div id="td-sched-full" class="tl"><div class="loading">読み込み中...</div></div>
-          <div style="padding:0 16px 16px"><button class="btn btn-dashed" onclick="openSchedModal('new')">予定を追加</button></div>
-        </div>
-      </div>
-
-      <!-- Panel 4: チャット -->
-      <div class="td-panel">
-        <div class="chat-bg" style="flex:1;display:flex;flex-direction:column">
-          <div id="td-chat-messages" class="chat-s"><div class="loading" style="color:rgba(255,255,255,.5)">読み込み中...</div></div>
-          <div class="chat-bar">
-            <button class="chat-plus" id="td-chat-plus"><span class="ico" style="width:18px;height:18px"></span></button>
-            <input id="td-chat-input" class="chat-inp" placeholder="メッセージを入力...">
-            <button class="chat-send-btn" onclick="sendTripChat()" id="td-chat-send"><span class="ico" style="width:18px;height:18px"></span></button>
-          </div>
-        </div>
-      </div>
-
     </div>
   </div>
   <!-- Bottom nav: アルバム / マップ / ホーム / 予定 / チャット -->
   <div class="bnav td-bnav" id="td-bnav">
-    <div class="bnav-i" onclick="tripTabGo(0)" id="td-bnav-album"></div>
-    <div class="bnav-i" onclick="tripTabGo(1)" id="td-bnav-map"></div>
-    <div class="bnav-i on" onclick="tripTabGo(2)" id="td-bnav-home"></div>
-    <div class="bnav-i" onclick="tripTabGo(3)" id="td-bnav-sched"></div>
-    <div class="bnav-i" onclick="tripTabGo(4)" id="td-bnav-chat"></div>
+    <div class="bnav-i" onclick="goTo('album')" id="td-bnav-album"></div>
+    <div class="bnav-i" id="td-bnav-map"></div>
+    <div class="bnav-i on" onclick="goTo('trip-detail')" id="td-bnav-home"></div>
+    <div class="bnav-i" onclick="goTo('schedule')" id="td-bnav-sched"></div>
+    <div class="bnav-i" onclick="goTo('chat')" id="td-bnav-chat"></div>
   </div>
 </div>
 
 <!-- SCHEDULE -->
 <div id="screen-schedule" class="screen">
-  <div class="sb b"><span>9:41</span><span style="font-size:13px">5G</span></div>
   <div class="nhdr"><span class="nhdr-back" onclick="goTo('trip-detail')" id="sched-back-btn"></span><div class="nhdr-t">タイムスケジュール</div><div class="nhdr-r" style="cursor:pointer" onclick="openSchedModal('new')">追加</div></div>
-  <div class="sched-bar"><button class="sched-btn" onclick="schedPrev()" id="sched-prev-btn"></button><div id="schedule-date-label"><div class="sched-d">読み込み中...</div></div><button class="sched-btn" onclick="schedNext()" id="sched-next-btn"></button></div>
-  <div class="scroll">
-    <div id="schedule-timeline" class="tl"><div class="loading">読み込み中...</div></div>
-    <div class="add-wrap"><button class="btn btn-dashed" onclick="openSchedModal('new')">予定を追加</button></div>
+  <div id="td-day-tabs" class="td-day-tabs"></div>
+  <div class="scroll" style="flex:1">
+    <div id="td-schedule-body" class="td-schedule">
+      <div class="loading">読み込み中...</div>
+    </div>
   </div>
-  <div class="tinav" style="position:relative">
-    <div class="ti" onclick="goTo('chat')"><span class="ico ti-ico" data-icon="chat"></span><span>チャット</span></div>
-    <div class="ti" onclick="goTo('camera-roll')"><span class="ico ti-ico" data-icon="camera"></span><span>写真</span></div>
-    <div class="ti" onclick="goTo('camera')"><span class="ico ti-ico" data-icon="camera"></span><span>カメラ</span></div>
-    <div class="ti" onclick="goTo('album')"><span class="ico ti-ico" data-icon="image"></span><span>アルバム</span></div>
-    <div class="ti on"><span class="ico ti-ico" data-icon="calendar"></span><span>予定</span></div>
+  <div class="bnav td-bnav" id="sched-bnav">
+    <div class="bnav-i" id="sched-bnav-album"></div>
+    <div class="bnav-i" id="sched-bnav-map"></div>
+    <div class="bnav-i" id="sched-bnav-home"></div>
+    <div class="bnav-i on" id="sched-bnav-sched"></div>
+    <div class="bnav-i" id="sched-bnav-chat"></div>
   </div>
 </div>
 
 <!-- CAMERA ROLL -->
 <div id="screen-camera-roll" class="screen">
-  <div class="sb b"><span>9:41</span><span style="font-size:13px">5G</span></div>
   <div class="nhdr"><span class="nhdr-back" onclick="goTo('trip-detail')" id="cr-back-btn"></span><div class="nhdr-t">共有カメラロール</div><div class="nhdr-r">選択</div></div>
   <div class="cr-filter"><div class="cr-c on">新着</div><div class="cr-c">人物</div><div class="cr-c">場所</div><div class="cr-c">地図</div></div>
   <div class="scroll" style="position:relative">
@@ -251,17 +222,21 @@
 
 <!-- ALBUM -->
 <div id="screen-album" class="screen">
+  <div class="nhdr"><span class="nhdr-back" onclick="goTo('trip-detail')" id="album-back-btn"></span><div class="nhdr-t">アルバム</div><div class="nhdr-r"></div></div>
   <div class="alb-hdr">
     <div id="album-name" class="alb-name">読み込み中...</div>
     <div id="album-members" class="alb-row"></div>
     <div id="album-stats" class="alb-stats"></div>
-    <div class="alb-tabs"><div class="alb-tab on" onclick="switchAlbumTab('member',this)">メンバー</div><div class="alb-tab" onclick="switchAlbumTab('place',this)">場所</div><div class="alb-tab" onclick="switchAlbumTab('date',this)">日付</div></div>
+    <div class="alb-tabs"><div class="alb-tab on" onclick="switchAlbumTab('all',this)">全て</div><div class="alb-tab" onclick="switchAlbumTab('member',this)">メンバー</div><div class="alb-tab" onclick="switchAlbumTab('place',this)">場所</div><div class="alb-tab" onclick="switchAlbumTab('date',this)">日付</div></div>
+    <div id="album-filter-chips" class="alb-filter-chips"></div>
   </div>
   <div class="scroll"><div id="album-body" class="alb-body"><div class="loading">読み込み中...</div></div></div>
-  <div class="bnav">
-    <div class="bnav-i" onclick="goTo('camera')"><span class="ico bnav-ico" data-icon="camera"></span><span>撮影</span></div>
-    <div class="bnav-i" onclick="goTo('home')"><span class="ico bnav-ico" data-icon="home"></span><span>ホーム</span></div>
-    <div class="bnav-i on"><span class="ico bnav-ico" data-icon="image"></span><span>アルバム</span></div>
+  <div class="bnav td-bnav" id="album-bnav">
+    <div class="bnav-i on" id="album-bnav-album"></div>
+    <div class="bnav-i" id="album-bnav-map"></div>
+    <div class="bnav-i" id="album-bnav-home"></div>
+    <div class="bnav-i" id="album-bnav-sched"></div>
+    <div class="bnav-i" id="album-bnav-chat"></div>
   </div>
 </div>
 
@@ -278,12 +253,41 @@
     <canvas id="cam-canvas" style="display:none"></canvas>
     <div id="cam-placeholder" class="cam-ph"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><div class="cam-ph-t">カメラを起動中...</div></div>
     <div id="cam-flash" style="position:absolute;inset:0;background:#fff;z-index:50;opacity:0;pointer-events:none;transition:opacity .1s"></div>
-    <div class="cam-top"><div><div style="color:rgba(255,255,255,.6);font-size:11px">旅行中</div><div id="cam-trip-name" class="cam-tn">--</div></div></div>
+    <div id="cam-preview" class="cam-preview" style="display:none">
+      <img id="cam-preview-img" class="cam-preview-img">
+      <div class="cam-preview-actions">
+        <button class="cam-preview-btn cam-preview-retake" onclick="dismissPreview()">撮り直す</button>
+        <button class="cam-preview-btn cam-preview-save" onclick="savePhotoToAlbum()">保存</button>
+      </div>
+    </div>
+    <div class="cam-top"><button class="cam-close-btn" onclick="goTo('trip-detail')" id="cam-close-btn"><span class="ico" style="width:20px;height:20px;color:#fff"></span></button><div><div style="color:rgba(255,255,255,.6);font-size:11px">旅行中</div><div id="cam-trip-name" class="cam-tn">--</div></div></div>
     <div id="cam-rec-indicator" class="cam-rec" style="display:none"><div class="cam-rec-dot"></div><span>REC</span></div>
+    <div id="cam-burst-counter" class="cam-burst-counter" style="display:none">0/10</div>
+    <div id="cam-mode-hint" class="cam-mode-hint" style="display:none"></div>
+    <!-- タイマー設定バー -->
+    <div id="cam-timer-bar" class="cam-sub-bar" style="display:none">
+      <div class="cam-timer-opt on" onclick="setTimerDuration(3,this)">3s</div>
+      <div class="cam-timer-opt" onclick="setTimerDuration(5,this)">5s</div>
+      <div class="cam-timer-opt" onclick="setTimerDuration(10,this)">10s</div>
+    </div>
+    <!-- フィルターバー -->
+    <div id="cam-filter-bar" class="cam-sub-bar" style="display:none">
+      <div class="cam-filter-nav" onclick="cycleFilter(-1)">◀</div>
+      <div id="cam-filter-label" class="cam-filter-label">OFF</div>
+      <div class="cam-filter-nav" onclick="cycleFilter(1)">▶</div>
+    </div>
+    <!-- パノラマガイド -->
+    <div id="cam-pano-guide" class="cam-mode-hint" style="display:none">← スライドして3枚撮影 →</div>
     <div class="cam-modes">
       <div class="cam-mode-btn on" data-mode="photo" onclick="setCamMode('photo')">写真</div>
       <div class="cam-mode-btn" data-mode="dual" onclick="setCamMode('dual')">デュアル</div>
-      <div class="cam-mode-btn" data-mode="video" onclick="setCamMode('video')">動画</div>
+      <div class="cam-mode-btn" data-mode="burst" onclick="setCamMode('burst')">連写</div>
+      <div class="cam-mode-btn" data-mode="short" onclick="setCamMode('short')">ショート</div>
+      <div class="cam-mode-btn" data-mode="timer" onclick="setCamMode('timer')">タイマー</div>
+      <div class="cam-mode-btn" data-mode="filter" onclick="setCamMode('filter')">フィルター</div>
+      <div class="cam-mode-btn" data-mode="stamp" onclick="setCamMode('stamp')">スタンプ</div>
+      <div class="cam-mode-btn" data-mode="pano" onclick="setCamMode('pano')">パノラマ</div>
+      <div class="cam-mode-btn" data-mode="timelapse" onclick="setCamMode('timelapse')">ラプス</div>
     </div>
     <div class="cam-ctrl">
       <button class="cam-flip" id="cam-flip-btn" onclick="flipCamera()"></button>
@@ -303,7 +307,6 @@
 
 <!-- CHAT (LINE-style) -->
 <div id="screen-chat" class="screen">
-  <div class="sb b"><span>9:41</span><span style="font-size:13px">5G</span></div>
   <div class="nhdr"><span class="nhdr-back" onclick="goTo('trip-detail')" id="chat-back-btn"></span><div id="chat-trip-name" class="nhdr-t">チャット</div><div class="nhdr-r" onclick="goTo('members')" id="chat-users-btn"></div></div>
   <div class="chat-bg">
     <div id="chat-messages" class="chat-s"><div class="loading" style="color:rgba(255,255,255,.5)">読み込み中...</div></div>
@@ -313,22 +316,27 @@
       <button class="chat-send-btn" onclick="sendChat()" id="chat-send-btn"><span class="ico" style="width:18px;height:18px"></span></button>
     </div>
   </div>
+  <div class="bnav td-bnav" id="chat-bnav">
+    <div class="bnav-i" id="chat-bnav-album"></div>
+    <div class="bnav-i" id="chat-bnav-map"></div>
+    <div class="bnav-i" id="chat-bnav-home"></div>
+    <div class="bnav-i" id="chat-bnav-sched"></div>
+    <div class="bnav-i on" id="chat-bnav-chat"></div>
+  </div>
 </div>
 
 <!-- MEMBERS -->
 <div id="screen-members" class="screen">
-  <div class="sb b"><span>9:41</span><span style="font-size:13px">5G</span></div>
   <div class="nhdr"><span class="nhdr-back" onclick="goTo('trip-detail')" id="mem-back-btn"></span><div class="nhdr-t">メンバー</div><div class="nhdr-r"></div></div>
   <div class="scroll"><div class="mem-body">
     <div id="members-list" class="mem-card"><div class="loading">読み込み中...</div></div>
     <div class="qr-box"><div style="font-size:15px;font-weight:700;color:var(--text)">仲間を招待</div><div class="qr-placeholder"><span class="ico" id="ico-qr"></span></div><div class="qr-label">QRコードをスキャンして参加<br>または招待リンクをシェア</div><button class="copy-link"><span class="ico" id="ico-link-copy"></span>招待リンクをコピー</button></div>
-    <button class="btn btn-blue-out">LINEで招待する</button>
+    <button class="btn btn-line" onclick="inviteViaLine()">LINEで招待する</button>
   </div></div>
 </div>
 
 <!-- SETTINGS (New) -->
 <div id="screen-settings" class="screen">
-  <div class="sb b"><span>9:41</span><span style="font-size:13px">5G</span></div>
   <div class="nhdr"><span class="nhdr-back" onclick="goTo('trip-detail')" id="settings-back-btn"></span><div class="nhdr-t">設定</div><div class="nhdr-r"></div></div>
   <div class="scroll">
     <div id="settings-body" class="settings-body">
@@ -339,7 +347,6 @@
 
 <!-- MAP (New) -->
 <div id="screen-map" class="screen">
-  <div class="sb b"><span>9:41</span><span style="font-size:13px">5G</span></div>
   <div class="nhdr"><span class="nhdr-back" onclick="goTo('trip-detail')" id="map-back-btn"></span><div class="nhdr-t">メンバーマップ</div><div class="nhdr-r"></div></div>
   <div class="map-container">
     <div id="leaflet-map"></div>
@@ -349,7 +356,6 @@
 
 <!-- PROFILE -->
 <div id="screen-profile" class="screen">
-  <div class="sb b"><span>9:41</span><span style="font-size:13px">5G</span></div>
   <div class="nhdr"><span class="nhdr-back" onclick="goTo('home')" id="prof-back-btn"></span><div class="nhdr-t">プロフィール</div><div class="nhdr-r"></div></div>
   <div class="scroll"><div class="prof-body">
     <div class="prof-card">
@@ -419,7 +425,9 @@
       <div class="cover-change-opt" style="background:linear-gradient(135deg,#f093fb,#f5576c)" onclick="changeTripCover('p4')"></div>
       <div class="cover-change-opt" style="background:linear-gradient(135deg,#4facfe,#00f2fe)" onclick="changeTripCover('p3')"></div>
     </div>
-    <label class="form-l" style="margin-top:16px">または画像URLを入力</label>
+    <label class="form-l" style="margin-top:16px">端末から写真を選択</label>
+    <input type="file" id="inp-cover-file" accept="image/*" class="form-i" onchange="applyCoverFile(this)" style="padding:10px">
+    <label class="form-l" style="margin-top:12px">または画像URLを入力</label>
     <input id="inp-cover-url" class="form-i" placeholder="https://example.com/photo.jpg">
     <button class="btn btn-pri" onclick="applyCoverUrl()">適用</button>
   </div>
@@ -432,6 +440,17 @@
     <div class="modal-t">グループ名を変更</div>
     <input id="inp-group-name" class="form-i" placeholder="新しいグループ名">
     <button class="btn btn-pri" onclick="changeGroupName()">変更する</button>
+  </div>
+</div>
+
+<!-- MODAL: Nickname -->
+<div id="modal-nickname" class="modal-ov">
+  <div class="modal-sh">
+    <div class="modal-bar"></div>
+    <div class="modal-t">ニックネームを設定</div>
+    <p style="font-size:13px;color:var(--text3);margin:0 0 12px">アプリ内で表示される名前です</p>
+    <input id="inp-nickname" class="form-i" placeholder="ニックネームを入力">
+    <button class="btn btn-pri" onclick="saveNickname()">始める</button>
   </div>
 </div>
 

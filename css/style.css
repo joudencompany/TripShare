@@ -30,8 +30,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 
 /* ===== NAV HEADER ===== */
 .nhdr{height:44px;display:flex;align-items:center;padding:0 16px;gap:12px;background:rgba(255,255,255,.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);flex-shrink:0}
-.nhdr-back{color:var(--pri);font-size:15px;cursor:pointer;display:flex;align-items:center;gap:4px;font-weight:500}
-.nhdr-back .ico{width:20px;height:20px}
+.nhdr-back{color:var(--pri);font-size:15px;cursor:pointer;display:flex;align-items:center;gap:2px;font-weight:600;padding:4px;border-radius:8px;min-width:32px;min-height:32px}
+.nhdr-back:active{background:rgba(33,150,243,.1)}
+.nhdr-back .ico{width:24px;height:24px}
 .nhdr-t{flex:1;text-align:center;font-size:17px;font-weight:600;color:var(--text)}
 .nhdr-r{color:var(--pri);font-size:15px;cursor:pointer;width:48px;text-align:right}
 
@@ -41,6 +42,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .btn-pri{background:linear-gradient(135deg,#2196F3,#42A5F5);color:#fff;box-shadow:0 4px 16px rgba(33,150,243,.3)}
 .btn-out{background:rgba(255,255,255,.2);color:#fff;border:1.5px solid rgba(255,255,255,.5);backdrop-filter:blur(8px)}
 .btn-blue-out{background:none;color:var(--pri);border:2px solid var(--pri)}
+.btn-line{background:#06C755;color:#fff;border:none;font-weight:700}
 .btn-dashed{background:none;color:var(--pri);border:2px dashed rgba(10,132,255,.3)}
 
 /* ===== SEGMENTS ===== */
@@ -75,7 +77,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .cov-h{background:linear-gradient(145deg,#78c6f0 0%,#a3daf5 40%,#d5effa 70%,#e8f4fc 100%)}
 
 /* ===== SPLASH ===== */
-#screen-splash{position:absolute;inset:0;overflow:hidden;background:url('../bg.jpg') center/cover no-repeat;background-color:#2a8ec4}
+#screen-splash{position:absolute;inset:0;overflow:hidden;background:url('../splash-bg.jpg') center/cover no-repeat;background-color:#2a8ec4}
 #screen-splash::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 0%,transparent 60%,rgba(0,0,0,.3) 100%)}
 .splash-body{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;flex:1;padding:0 36px}
 .splash-top{flex:1}
@@ -83,10 +85,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .splash-status{text-align:center;font-size:13px;color:rgba(255,255,255,.7);margin-top:6px;min-height:18px}
 #screen-splash .btn-pri{background:#0A84FF;box-shadow:none}
 #screen-splash .btn-out{background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.5);backdrop-filter:blur(8px)}
+/* Guest form */
+.guest-form{background:rgba(0,0,0,.45);backdrop-filter:blur(20px);border-radius:16px;padding:20px;margin-top:12px}
+.guest-form .form-i{background:#fff;color:#333;margin-bottom:10px;border:none;border-radius:10px;padding:14px 16px;font-size:15px;width:100%;box-sizing:border-box}
+.guest-form .form-i::placeholder{color:#999}
+.guest-form .btn-pri{width:100%;margin-top:6px;padding:14px}
+.guest-tabs{display:flex;gap:0;margin-bottom:14px;background:rgba(255,255,255,.15);border-radius:10px;overflow:hidden}
+.guest-tab{flex:1;text-align:center;padding:12px;font-size:15px;font-weight:700;color:rgba(255,255,255,.5);cursor:pointer;transition:all .2s}
+.guest-tab.on{background:rgba(255,255,255,.25);color:#fff}
+.guest-back-link{text-align:center;margin-top:12px;font-size:14px;color:rgba(255,255,255,.8);cursor:pointer;text-decoration:underline}
+/* ログイン中ステータス */
+.splash-login-status{position:absolute;bottom:60px;left:0;right:0;text-align:center;font-size:13px;color:rgba(255,255,255,.7);z-index:3}
 
 /* ===== HOME ===== */
 #screen-home{background:var(--bg)}
-.home-hdr{background:var(--surface);padding:52px 20px 0;flex-shrink:0}
+.home-hdr{background:var(--surface);padding:12px 20px 0;flex-shrink:0}
 .home-hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 .home-logo-row{display:flex;align-items:center;gap:10px}
 .home-logo-icon{width:28px;height:28px}
@@ -143,14 +156,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 
 /* ===== TRIP DETAIL (New Design) ===== */
 #screen-trip-detail{background:var(--bg);display:flex;flex-direction:column}
-.td-cover-wrap{position:relative;flex-shrink:0}
-.td-cover{width:100%;height:340px;position:relative;display:flex;align-items:flex-end;background-size:cover;background-position:center}
+.td-main-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.td-main-scroll::-webkit-scrollbar{display:none}
+.td-cover{width:100%;height:340px;position:relative;display:flex;align-items:flex-end;background-size:cover;background-position:center;flex-shrink:0}
 .td-cover-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.1) 0%,rgba(0,0,0,.45) 100%)}
-.td-back-btn{position:absolute;top:50px;left:16px;z-index:10;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.25);backdrop-filter:blur(8px);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.td-back-btn .ico{width:20px;height:20px;color:#fff}
+.td-back-btn{position:absolute;top:50px;left:16px;z-index:10;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.35);backdrop-filter:blur(8px);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.td-back-btn:active{background:rgba(0,0,0,.5)}
+.td-back-btn .ico{width:22px;height:22px;color:#fff}
 .td-more-btn{position:absolute;top:50px;right:16px;z-index:10;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.25);backdrop-filter:blur(8px);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .td-more-btn .ico{width:20px;height:20px;color:#fff}
-.td-cover-title{position:relative;z-index:5;padding:20px;font-size:26px;font-weight:800;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.4);width:100%}
+.td-cover-title{position:relative;z-index:5;padding:20px;padding-bottom:40px;font-size:26px;font-weight:800;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.4);width:100%}
 .trip-menu{display:none;position:absolute;top:92px;right:16px;z-index:50;background:#fff;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);overflow:hidden;min-width:200px}
 .trip-menu.show{display:block}
 .trip-menu-item{display:flex;align-items:center;gap:10px;padding:14px 16px;font-size:14px;font-weight:500;color:var(--text);cursor:pointer;border-bottom:1px solid var(--border)}
@@ -267,7 +282,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .cr-fab .ico{width:22px;height:22px;color:#fff}
 
 /* ===== ALBUM ===== */
-.alb-hdr{background:linear-gradient(180deg,var(--pri-light) 0%,var(--surface) 100%);padding:52px 20px 0;flex-shrink:0;border-bottom:1px solid var(--border)}
+.alb-hdr{background:linear-gradient(180deg,var(--pri-light) 0%,var(--surface) 100%);padding:16px 20px 0;flex-shrink:0;border-bottom:1px solid var(--border)}
 .alb-name{font-size:22px;font-weight:800;color:var(--text);margin-bottom:8px}
 .alb-row{display:flex;align-items:center;gap:6px;margin-bottom:10px}
 .alb-stats{display:flex;gap:16px;padding:6px 0 10px}
@@ -276,6 +291,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .alb-tabs{display:flex;border-top:1px solid var(--border)}
 .alb-tab{flex:1;padding:11px 0;text-align:center;font-size:13px;color:var(--text3);cursor:pointer;border-bottom:2.5px solid transparent;font-weight:500}
 .alb-tab.on{color:var(--pri);border-color:var(--pri);font-weight:700}
+.alb-filter-chips{display:flex;gap:8px;padding:8px 16px;overflow-x:auto;flex-shrink:0}
+.alb-filter-chips::-webkit-scrollbar{display:none}
+.alb-chip{padding:6px 14px;border-radius:16px;font-size:13px;font-weight:500;background:var(--bg);color:var(--text3);cursor:pointer;white-space:nowrap;border:1px solid var(--border);transition:all .2s}
+.alb-chip.on{background:var(--pri);color:#fff;border-color:var(--pri)}
 .alb-body{padding:16px}
 .day-sec{margin-bottom:20px}
 .day-label{font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px}
@@ -405,7 +424,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 @keyframes flash{0%{opacity:1}100%{opacity:0}}
 
 /* ===== NAVIGATION < > ARROWS ===== */
-.nav-arrows{display:flex;justify-content:space-between;padding:0 20px;height:20px;align-items:center}
+.nav-arrows{display:none}
 .nav-arrow{width:28px;height:28px;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text3);transition:opacity .2s}
 .nav-arrow:disabled{opacity:.2;cursor:default}
 .nav-arrow .ico{width:16px;height:16px}
@@ -440,4 +459,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
   .td-cover{height:45vh}
   .td-back-btn{top:env(safe-area-inset-top,44px)}
   .td-more-btn{top:env(safe-area-inset-top,44px)}
+}
+
+/* ===== RESPONSIVE (Tablet fullscreen) ===== */
+@media (min-width: 501px) and (max-width: 1024px) {
+  body{padding:0;background:var(--bg)}
+  #phone{width:100%;height:100vh;height:100dvh;border-radius:0;box-shadow:none;max-width:none}
+  .td-cover{height:40vh}
+  .td-back-btn{top:env(safe-area-inset-top,20px)}
+  .td-more-btn{top:env(safe-area-inset-top,20px)}
+  .msg-b{max-width:60vw}
+  .trip-card .trip-cover{height:220px}
 }

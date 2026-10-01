@@ -2,7 +2,9 @@
 
 // ===== Firebase imports =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+  signOut, onAuthStateChanged,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, query, where,
   onSnapshot, serverTimestamp, doc, setDoc, getDoc, getDocs, Timestamp, updateDoc, arrayUnion }
@@ -98,54 +100,183 @@ onAuthStateChanged(auth, async (user) => {
     } catch(e) { console.warn("Firestore処理スキップ:", e.message); }
 
     const splash = document.getElementById("screen-splash");
-    if (splash && splash.classList.contains("active")) {
-      // ログイン済み → splashを1.5秒表示してからhomeへ遷移
-      const st = document.getElementById("splash-status");
-      if (st) st.textContent = user.displayName + " でログイン中...";
+    const splashActive = splash && splash.classList.contains("active");
+
+    if (splashActive) {
+      const loginBtns = document.getElementById("splash-btns");
+      if (loginBtns) loginBtns.style.display = "none";
+
+      // ログイン中ステータス表示
+      const loginStatus = document.getElementById("splash-login-status");
+      if (loginStatus) {
+        const displayName = user.displayName || user.email?.replace('@tripshare.local','') || 'ユーザー';
+        loginStatus.textContent = displayName + ' でログイン中...';
+        loginStatus.style.display = '';
+      }
+    }
+
+    // ニックネーム未設定チェック（Googleログイン初回）
+    let hasNickname = true;
+    try {
+      const userRef2 = doc(db, "users", user.uid);
+      const uSnap = await getDoc(userRef2);
+      hasNickname = uSnap.exists() && uSnap.data().nickname;
+    } catch(e) { console.warn("ニックネームチェックスキップ:", e.message); }
+
+    if (!hasNickname && !user.email?.endsWith('@tripshare.local') && splashActive) {
+      window._pendingNickname = true;
+      const modal = document.getElementById('modal-nickname');
+      if (modal) {
+        const inp = document.getElementById('inp-nickname');
+        if (inp) inp.value = user.displayName || '';
+        modal.classList.add('show');
+        startWatchingTrips(user.uid);
+        startWatchingPublicPosts();
+      } else {
+        // モーダルが見つからない場合はそのままホームへ
+        setTimeout(() => {
+          goTo("home");
+          startWatchingTrips(user.uid);
+          startWatchingPublicPosts();
+        }, 500);
+      }
+    } else {
       setTimeout(() => {
         goTo("home");
         startWatchingTrips(user.uid);
         startWatchingPublicPosts();
-      }, 1500);
+      }, splashActive ? 1500 : 0);
     }
   } else {
     window._fbUser = null;
     if (unsubTrips) { unsubTrips(); unsubTrips = null; }
     if (unsubPublicPosts) { unsubPublicPosts(); unsubPublicPosts = null; }
 
-    // 以前ログインしていた場合 → splash画面で「ログイン中...」表示
-    if (localStorage.getItem('tripshare_logged_in')) {
-      const st = document.getElementById("splash-status");
-      if (st) st.textContent = "ログイン中...";
-      const loginBtns = document.querySelector(".splash-btns");
-      if (loginBtns) loginBtns.style.display = "none";
-      // セッション切れの場合: ポップアップでログイン試行
-      try {
-        await signInWithPopup(auth, new GoogleAuthProvider());
-        // 成功すればonAuthStateChangedが再発火してhomeへ遷移する
-      } catch(e) {
-        console.warn("自動再ログイン失敗:", e.message);
+    // 初回 or セッション切れ → ボタン表示
+    const loginBtns = document.getElementById("splash-btns");
+    if (!localStorage.getItem('tripshare_logged_in')) {
+      // 初回訪問: ボタンを表示
+      if (loginBtns) loginBtns.style.display = "";
+    } else {
+      // セッション切れ: 2秒待ってからボタン表示
+      setTimeout(() => {
         localStorage.removeItem('tripshare_logged_in');
-        // ボタンを再表示して通常のsplashに戻す
-        if (st) st.textContent = "";
         if (loginBtns) loginBtns.style.display = "";
-      }
+      }, 2000);
     }
   }
 });
 
-// ===== Googleログイン =====
+// ===== Googleログイン（popup → 失敗時は常にredirect） =====
 window.loginGoogle = async () => {
+  const provider = new GoogleAuthProvider();
   try {
-    const result = await signInWithPopup(auth, new GoogleAuthProvider());
-    setTimeout(() => {
-      if (document.getElementById("screen-splash")?.classList.contains("active")) {
-        goTo("home");
-        startWatchingTrips(result.user.uid);
-        startWatchingPublicPosts();
+    await signInWithPopup(auth, provider);
+  } catch(e) {
+    if (e.code === 'auth/popup-closed-by-user') return; // ユーザーが自分で閉じた
+    console.warn("Popup失敗 (" + e.code + ")、redirectにフォールバック");
+    try {
+      await signInWithRedirect(auth, provider);
+    } catch(e2) {
+      alert("ログイン失敗: " + e2.message);
+    }
+  }
+};
+
+// リダイレクト結果の処理（モバイルログイン後のページ復帰時）
+getRedirectResult(auth).then((result) => {
+  if (result && result.user) console.log("リダイレクトログイン成功:", result.user.displayName);
+}).catch(e => console.warn("リダイレクト結果:", e.message));
+
+// ===== ゲストIDフォーム表示/非表示 =====
+window.showGuestForm = () => {
+  const form = document.getElementById('guest-form');
+  if (form) form.style.display = '';
+};
+window.hideGuestForm = () => {
+  const form = document.getElementById('guest-form');
+  if (form) form.style.display = 'none';
+};
+window.switchGuestTab = (tab, el) => {
+  document.querySelectorAll('.guest-tab').forEach(t => t.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('guest-tab-login').style.display = tab === 'login' ? '' : 'none';
+  document.getElementById('guest-tab-register').style.display = tab === 'register' ? '' : 'none';
+};
+
+// ===== ゲストID新規登録 =====
+window.registerGuest = async () => {
+  const id = document.getElementById('guest-reg-id')?.value?.trim();
+  const pw = document.getElementById('guest-reg-pw')?.value;
+  const nick = document.getElementById('guest-reg-nick')?.value?.trim();
+  if (!id) { alert('ゲストIDを入力してください'); return; }
+  if (!pw || pw.length < 6) { alert('パスワードは6文字以上で入力してください'); return; }
+  if (!nick) { alert('ニックネームを入力してください'); return; }
+  try {
+    const email = id + '@tripshare.local';
+    const cred = await createUserWithEmailAndPassword(auth, email, pw);
+    await updateProfile(cred.user, { displayName: nick });
+    // Firestoreにユーザー文書作成
+    await setDoc(doc(db, "users", cred.user.uid), {
+      uid: cred.user.uid,
+      name: nick,
+      nickname: nick,
+      email: email,
+      avatar: "",
+      createdAt: serverTimestamp()
+    });
+    // onAuthStateChangedが処理する
+  } catch(e) {
+    if (e.code === 'auth/email-already-in-use') {
+      alert('このゲストIDは既に使われています');
+    } else {
+      alert('登録失敗: ' + e.message);
+    }
+  }
+};
+
+// ===== ゲストIDログイン =====
+window.loginGuest = async () => {
+  const id = document.getElementById('guest-login-id')?.value?.trim();
+  const pw = document.getElementById('guest-login-pw')?.value;
+  if (!id || !pw) { alert('IDとパスワードを入力してください'); return; }
+  try {
+    await signInWithEmailAndPassword(auth, id + '@tripshare.local', pw);
+    // onAuthStateChangedが処理する
+  } catch(e) {
+    if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+      alert('IDまたはパスワードが間違っています');
+    } else {
+      alert('ログイン失敗: ' + e.message);
+    }
+  }
+};
+
+// ===== ニックネーム保存 =====
+window.saveNickname = async () => {
+  const nick = document.getElementById('inp-nickname')?.value?.trim();
+  if (!nick) { alert('ニックネームを入力してください'); return; }
+  const user = auth.currentUser;
+  if (!user) return;
+  try {
+    await updateProfile(user, { displayName: nick });
+    await updateDoc(doc(db, "users", user.uid), { name: nick, nickname: nick });
+    window._fbUser = user;
+    document.getElementById('modal-nickname')?.classList.remove('show');
+
+    // 全参加グループのmembers配列を更新
+    try {
+      const tripsSnap = await getDocs(query(collection(db, "trips"), where("memberUids", "array-contains", user.uid)));
+      for (const tripDoc of tripsSnap.docs) {
+        const data = tripDoc.data();
+        const members = data.members || [];
+        const updated = members.map(m => m.uid === user.uid ? { ...m, name: nick, initial: nick.charAt(0) } : m);
+        await updateDoc(doc(db, "trips", tripDoc.id), { members: updated });
       }
-    }, 2000);
-  } catch(e) { alert("ログイン失敗: " + e.message); }
+    } catch(e2) { console.warn('グループのニックネーム更新スキップ:', e2.message); }
+
+    goTo("home");
+  } catch(e) { alert('保存失敗: ' + e.message); }
 };
 
 // ===== ログアウト =====
@@ -358,6 +489,20 @@ function goTo(id) {
   const el = document.getElementById(screens[id]);
   if (el) el.classList.add('active');
 
+  // Update footer highlights
+  const footerMap = {'album':'album','map':'map','trip-detail':'home','schedule':'sched','chat':'chat'};
+  const activeFooterKey = footerMap[id];
+  if (activeFooterKey) {
+    const bnav = el.querySelector('.td-bnav');
+    if (bnav) {
+      bnav.querySelectorAll('.bnav-i').forEach(b => b.classList.remove('on'));
+      // Find the matching bnav-i by checking its id ending
+      bnav.querySelectorAll('.bnav-i').forEach(b => {
+        if (b.id && b.id.endsWith('-' + activeFooterKey)) b.classList.add('on');
+      });
+    }
+  }
+
   // ナビ履歴に追加
   if (!navLock) {
     if (navIndex < navHistory.length - 1) {
@@ -463,80 +608,9 @@ window.startWatchingSchedules = startWatchingSchedules;
 // window.renderTripDetailMembers / window.renderTripDetailSchedule
 // window.initMap
 
-// ============================================================
-//  トリップ内スワイプナビゲーション
-// ============================================================
-
-// パネル順: 0=アルバム, 1=マップ, 2=ホーム, 3=予定, 4=チャット
-let tripTabIndex = 2; // デフォルト: ホーム
-
-function tripTabGo(idx) {
-  if (idx < 0 || idx > 4) return;
-  tripTabIndex = idx;
-  const track = document.getElementById('td-swipe-track');
-  if (track) track.style.transform = `translateX(-${idx * 20}%)`;
-
-  // フッターのアクティブ状態更新
-  const bnav = document.getElementById('td-bnav');
-  if (bnav) {
-    bnav.querySelectorAll('.bnav-i').forEach((el, i) => {
-      el.classList.toggle('on', i === idx);
-    });
-  }
-
-  // パネル固有の初期化
-  if (idx === 1 && window.initTripMap) window.initTripMap();
-  if (idx === 4) {
-    // チャット: 埋め込みチャットのメッセージを最新にスクロール
-    setTimeout(() => {
-      const chatEl = document.getElementById('td-chat-messages');
-      if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;
-    }, 100);
-  }
-}
-window.tripTabGo = tripTabGo;
-
-// スワイプ検出
-(function initSwipe() {
-  let startX = 0, startY = 0, tracking = false;
-  const wrap = () => document.getElementById('td-swipe-wrap');
-
-  document.addEventListener('touchstart', (e) => {
-    if (!wrap() || !wrap().contains(e.target)) return;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    tracking = true;
-  }, { passive: true });
-
-  document.addEventListener('touchend', (e) => {
-    if (!tracking) return;
-    tracking = false;
-    const dx = e.changedTouches[0].clientX - startX;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx)) return; // 縦スクロールは無視
-    if (dx > 0) {
-      // 右スワイプ → 左のパネルへ
-      tripTabGo(tripTabIndex - 1);
-    } else {
-      // 左スワイプ → 右のパネルへ
-      tripTabGo(tripTabIndex + 1);
-    }
-  }, { passive: true });
-})();
-
-// トリップ詳細に入ったときパネルをホーム(2)にリセット
-function resetTripPanels() {
-  tripTabIndex = 2;
-  const track = document.getElementById('td-swipe-track');
-  if (track) track.style.transform = 'translateX(-200%)';
-  // フッターリセット
-  const bnav = document.getElementById('td-bnav');
-  if (bnav) {
-    bnav.querySelectorAll('.bnav-i').forEach((el, i) => {
-      el.classList.toggle('on', i === 2);
-    });
-  }
-}
+// tripTabGo / resetTripPanels: kept as no-ops for compatibility
+window.tripTabGo = () => {};
+function resetTripPanels() {}
 
 // 埋め込みチャットの送信
 window.sendTripChat = () => {
@@ -567,3 +641,57 @@ document.addEventListener('DOMContentLoaded', () => {
 // ユーティリティをグローバル公開（他ファイルのテンプレートから参照できるように）
 window.esc = esc;
 window.formatDateRange = formatDateRange;
+
+// ===== Swipe navigation between footer screens =====
+const footerScreenOrder = ['album', 'map', 'trip-detail', 'schedule', 'chat'];
+let swipeStartX = 0;
+let swipeStartY = 0;
+let swiping = false;
+
+function getFooterIndex(screenId) {
+  return footerScreenOrder.indexOf(screenId);
+}
+
+function getCurrentFooterScreen() {
+  // Check which footer screen is currently active
+  const active = document.querySelector('.screen.active');
+  if (!active) return -1;
+  const screenMap = {
+    'screen-album': 'album',
+    'screen-map': 'map',
+    'screen-trip-detail': 'trip-detail',
+    'screen-schedule': 'schedule',
+    'screen-chat': 'chat'
+  };
+  const id = active.id;
+  const name = screenMap[id];
+  return name ? getFooterIndex(name) : -1;
+}
+
+document.addEventListener('touchstart', (e) => {
+  const idx = getCurrentFooterScreen();
+  if (idx === -1) return;
+  swipeStartX = e.touches[0].clientX;
+  swipeStartY = e.touches[0].clientY;
+  swiping = true;
+}, { passive: true });
+
+document.addEventListener('touchend', (e) => {
+  if (!swiping) return;
+  swiping = false;
+  const dx = e.changedTouches[0].clientX - swipeStartX;
+  const dy = e.changedTouches[0].clientY - swipeStartY;
+  // Only trigger if horizontal swipe is dominant and long enough
+  if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+
+  const idx = getCurrentFooterScreen();
+  if (idx === -1) return;
+
+  if (dx < 0 && idx < footerScreenOrder.length - 1) {
+    // Swipe left → next screen
+    goTo(footerScreenOrder[idx + 1]);
+  } else if (dx > 0 && idx > 0) {
+    // Swipe right → previous screen
+    goTo(footerScreenOrder[idx - 1]);
+  }
+}, { passive: true });
