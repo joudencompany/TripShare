@@ -167,26 +167,54 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
-// ===== Googleログイン（popup → 失敗時は常にredirect） =====
+// ===== Googleログイン =====
 window.loginGoogle = async () => {
   const provider = new GoogleAuthProvider();
+  // タッチデバイス（モバイル/タブレット）はpopupが信頼できないのでredirect直接
+  const isTouch = window.matchMedia('(pointer: coarse)').matches;
+  if (isTouch) {
+    try { await signInWithRedirect(auth, provider); }
+    catch(e) { _showSplashError("ログイン失敗: " + e.message); }
+    return;
+  }
+  // デスクトップ: popup → 失敗時redirect
   try {
     await signInWithPopup(auth, provider);
   } catch(e) {
-    if (e.code === 'auth/popup-closed-by-user') return; // ユーザーが自分で閉じた
-    console.warn("Popup失敗 (" + e.code + ")、redirectにフォールバック");
-    try {
-      await signInWithRedirect(auth, provider);
-    } catch(e2) {
-      alert("ログイン失敗: " + e2.message);
+    if (e.code === 'auth/popup-closed-by-user') return;
+    console.warn("Popup失敗 (" + e.code + ")");
+    if (e.code === 'auth/unauthorized-domain') {
+      _showSplashError("ドメインが未認証です。Firebase Console → Authentication → Authorized domains に登録してください。");
+      return;
     }
+    try { await signInWithRedirect(auth, provider); }
+    catch(e2) { _showSplashError("ログイン失敗: " + e2.message); }
   }
 };
+
+// ===== スプラッシュエラー表示 =====
+function _showSplashError(msg) {
+  const status = document.getElementById('splash-login-status');
+  if (status) {
+    status.textContent = msg;
+    status.style.display = '';
+    status.style.color = 'rgba(255,140,140,1)';
+  }
+  const btns = document.getElementById('splash-btns');
+  if (btns) btns.style.display = '';
+}
 
 // リダイレクト結果の処理（モバイルログイン後のページ復帰時）
 getRedirectResult(auth).then((result) => {
   if (result && result.user) console.log("リダイレクトログイン成功:", result.user.displayName);
-}).catch(e => console.warn("リダイレクト結果:", e.message));
+}).catch(e => {
+  console.warn("リダイレクト結果エラー:", e.code, e.message);
+  if (e.code === 'auth/unauthorized-domain') {
+    _showSplashError("このドメインはFirebaseの認証許可リストに未登録です。Firebase Console → Authentication → Authorized domains に追加してください。");
+  } else if (e.code !== 'auth/no-auth-event') {
+    _showSplashError("ログイン失敗: " + e.message);
+  }
+});
 
 // ===== ゲストIDフォーム表示/非表示 =====
 window.showGuestForm = () => {
