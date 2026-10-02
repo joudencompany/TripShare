@@ -77,8 +77,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP"
 .cov-h{background:linear-gradient(145deg,#78c6f0 0%,#a3daf5 40%,#d5effa 70%,#e8f4fc 100%)}
 
 /* ===== SPLASH ===== */
-#screen-splash{position:absolute;inset:0;overflow:hidden;background:url('../Designer.png') top center/cover no-repeat;background-color:#2a8ec4}
-#screen-splash::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.15) 0%,transparent 40%,transparent 55%,rgba(0,0,0,.4) 100%)}
+#screen-splash{position:absolute;inset:0;overflow:hidden;background:url('../Designer.png') 50% 35%/cover no-repeat;background-color:#2a8ec4}
+#screen-splash::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,40,80,.85) 0%,rgba(10,40,80,.6) 30%,rgba(0,0,0,.05) 55%,rgba(0,0,0,.4) 100%)}
 .splash-logo-overlay{position:absolute;top:clamp(40px,8vh,80px);left:50%;transform:translateX(-50%);z-index:10;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;white-space:nowrap}
 .splash-logo-svg{width:56px;height:56px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.25))}
 .splash-logo-name{font-size:30px;font-weight:800;color:#fff;letter-spacing:-.5px;text-shadow:0 2px 10px rgba(0,0,0,.35)}
